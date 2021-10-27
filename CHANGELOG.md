@@ -1,6 +1,14 @@
 # CHANGELOG
 
-## [7.9.1](https://github.com/auth0/auth0-PHP/tree/7.9.0) (2021-07-06)
+## [7.9.2](https://github.com/auth0/auth0-PHP/tree/7.9.2) (2021-08-03)
+
+[Full Changelog](https://github.com/auth0/auth0-PHP/compare/7.9.1...7.9.2)
+
+**Fixed**
+
+- Add missing API2 POST /tickets/password-change params [\#523](https://github.com/auth0/auth0-PHP/pull/523) ([evansims](https://github.com/evansims))
+
+## [7.9.1](https://github.com/auth0/auth0-PHP/tree/7.9.1) (2021-07-06)
 
 [Full Changelog](https://github.com/auth0/auth0-PHP/compare/7.9.0...7.9.1)
 
@@ -148,7 +156,7 @@ SDK 7.6 introduces support for [the newly released PHP 8.0](https://www.php.net/
 
 **BEFORE YOU UPGRADE**
 
-This is a major release with several breaking changes. Please see the [v5 to v7 migration guide here](https://github.com/auth0/auth0-PHP/blob/master/MIGRATE-v5-TO-v7.md) before you upgrade.
+This is a major release with several breaking changes. Please see the [v5 to v7 migration guide here](https://github.com/auth0/auth0-PHP/blob/7.x/MIGRATE-v5-TO-v7.md) before you upgrade.
 
 **Added**
 
