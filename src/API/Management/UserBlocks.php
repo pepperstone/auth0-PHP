@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -23,15 +23,23 @@ final class UserBlocks extends ManagementEndpoint
      * @param string              $id      User ID to query for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/User_Blocks/get_user_blocks_by_id
      */
     public function get(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('user-blocks', $id)
             ->withOptions($options)
             ->call();
@@ -44,15 +52,23 @@ final class UserBlocks extends ManagementEndpoint
      * @param string              $id      The user_id of the user to update.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/User_Blocks/delete_user_blocks_by_id
      */
     public function delete(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('user-blocks', $id)
             ->withOptions($options)
             ->call();
@@ -65,15 +81,23 @@ final class UserBlocks extends ManagementEndpoint
      * @param string              $identifier Should be any of a username, phone number, or email.
      * @param RequestOptions|null $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `identifier` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/User_Blocks/get_user_blocks
      */
     public function getByIdentifier(
         string $identifier,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($identifier, 'identifier');
+        [$identifier] = Toolkit::filter([$identifier])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$identifier, \Auth0\SDK\Exception\ArgumentException::missing('identifier')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('user-blocks')
             ->withParam('identifier', $identifier)
             ->withOptions($options)
@@ -87,15 +111,23 @@ final class UserBlocks extends ManagementEndpoint
      * @param string              $identifier Should be any of a username, phone number, or email.
      * @param RequestOptions|null $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `identifier` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/User_Blocks/delete_user_blocks
      */
     public function deleteByIdentifier(
         string $identifier,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($identifier, 'identifier');
+        [$identifier] = Toolkit::filter([$identifier])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$identifier, \Auth0\SDK\Exception\ArgumentException::missing('identifier')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('user-blocks')
             ->withParam('identifier', $identifier)
             ->withOptions($options)

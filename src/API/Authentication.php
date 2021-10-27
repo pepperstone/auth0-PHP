@@ -6,8 +6,7 @@ namespace Auth0\SDK\API;
 
 use Auth0\SDK\Configuration\SdkConfiguration;
 use Auth0\SDK\Utility\HttpClient;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -16,9 +15,9 @@ use Psr\Http\Message\ResponseInterface;
 final class Authentication
 {
     /**
-     * HttpClient instance.
+     * Instance of Auth0\SDK\API\Utility\HttpClient.
      */
-    private HttpClient $httpClient;
+    private ?HttpClient $httpClient = null;
 
     /**
      * Instance of SdkConfiguration, for shared configuration across classes.
@@ -29,6 +28,8 @@ final class Authentication
      * Authentication constructor.
      *
      * @param SdkConfiguration|array<mixed> $configuration Required. Base configuration options for the SDK. See the SdkConfiguration class constructor for options.
+     *
+     * @throws \Auth0\SDK\Exception\ConfigurationException When an invalidation `configuration` is provided.
      *
      * @psalm-suppress DocblockTypeContradiction
      */
@@ -46,10 +47,7 @@ final class Authentication
         }
 
         // Store the configuration internally.
-        $this->configuration = & $configuration;
-
-        // Build the HTTP client.
-        $this->httpClient = new HttpClient($this->configuration);
+        $this->configuration = $configuration;
     }
 
     /**
@@ -57,7 +55,11 @@ final class Authentication
      */
     public function getHttpClient(): HttpClient
     {
-        return $this->httpClient;
+        if ($this->httpClient !== null) {
+            return $this->httpClient;
+        }
+
+        return $this->httpClient = new HttpClient($this->configuration, HttpClient::CONTEXT_AUTHENTICATION_CLIENT);
     }
 
     /**
@@ -66,17 +68,27 @@ final class Authentication
      * @param string|null $clientId   Optional. Client ID to use. Defaults to the SDK's configured Client ID.
      * @param string|null $connection Optional. The connection to use. If no connection is specified, the Auth0 Login Page will be shown.
      *
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a $clientId is not configured.
+     *
      * @link https://auth0.com/docs/connections/enterprise/samlp
      */
     public function getSamlpLink(
         ?string $clientId = null,
         ?string $connection = null
     ): string {
+        [$clientId, $connection] = Toolkit::filter([$clientId, $connection])->string()->trim();
+
+        [$clientId] = Toolkit::filter([
+            [$clientId, $this->configuration->getClientId()],
+        ])->array()->first(\Auth0\SDK\Exception\ConfigurationException::requiresClientId());
+
         return sprintf(
-            '%s/samlp/%s?connection=%s',
-            $this->configuration->buildDomainUri(),
-            Shortcut::trimNull($clientId) ?? $this->configuration->getClientId(),
-            Shortcut::trimNull($connection) ?? ''
+            '%s/samlp/%s?%s',
+            $this->configuration->formatDomain(),
+            $clientId,
+            http_build_query(Toolkit::filter([
+                ['connection' => $connection],
+            ])->array()->trim()[0], '', '&', PHP_QUERY_RFC3986)
         );
     }
 
@@ -85,15 +97,23 @@ final class Authentication
      *
      * @param string|null $clientId Optional. Client ID to use. Defaults to the SDK's configured Client ID.
      *
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a $clientId is not configured.
+     *
      * @link https://auth0.com/docs/connections/enterprise/samlp
      */
     public function getSamlpMetadataLink(
         ?string $clientId = null
     ): string {
+        [$clientId] = Toolkit::filter([$clientId])->string()->trim();
+
+        [$clientId] = Toolkit::filter([
+            [$clientId, $this->configuration->getClientId()],
+        ])->array()->first(\Auth0\SDK\Exception\ConfigurationException::requiresClientId());
+
         return sprintf(
             '%s/samlp/metadata/%s',
-            $this->configuration->buildDomainUri(),
-            Shortcut::trimNull($clientId) ?? $this->configuration->getClientId()
+            $this->configuration->formatDomain(),
+            $clientId
         );
     }
 
@@ -103,17 +123,26 @@ final class Authentication
      * @param string|null                 $clientId Optional. Client ID to use. Defaults to the SDK's configured Client ID.
      * @param array<int|string|null>|null $params   Optional. Additional parameters to include with the request. See @link for details.
      *
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a $clientId is not configured.
+     *
      * @link https://auth0.com/docs/protocols/ws-fed
      */
     public function getWsfedLink(
         ?string $clientId = null,
         ?array $params = null
     ): string {
+        [$clientId] = Toolkit::filter([$clientId])->string()->trim();
+        [$params] = Toolkit::filter([$params])->array()->trim();
+
+        [$clientId] = Toolkit::filter([
+            [$clientId, $this->configuration->getClientId()],
+        ])->array()->first(\Auth0\SDK\Exception\ConfigurationException::requiresClientId());
+
         return sprintf(
             '%s/wsfed/%s?%s',
-            $this->configuration->buildDomainUri(),
-            Shortcut::trimNull($clientId) ?? $this->configuration->getClientId(),
-            http_build_query($params ?? [], '', '&', PHP_QUERY_RFC3986)
+            $this->configuration->formatDomain(),
+            $clientId,
+            http_build_query($params, '', '&', PHP_QUERY_RFC3986)
         );
     }
 
@@ -124,7 +153,10 @@ final class Authentication
      */
     public function getWsfedMetadataLink(): string
     {
-        return $this->configuration->buildDomainUri() . '/wsfed/FederationMetadata/2007-06/FederationMetadata.xml';
+        return sprintf(
+            '%s/wsfed/FederationMetadata/2007-06/FederationMetadata.xml',
+            $this->configuration->formatDomain()
+        );
     }
 
     /**
@@ -134,6 +166,10 @@ final class Authentication
      * @param string|null                 $redirectUri Optional. URI to return to after logging out. Defaults to the SDK's configured redirectUri.
      * @param array<int|string|null>|null $params      Optional. Additional parameters to include with the request. See @link for details.
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `state` is passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a $redirectUri is not configured.
+     *
      * @link https://auth0.com/docs/api/authentication#authorize-application
      */
     public function getLoginLink(
@@ -141,61 +177,62 @@ final class Authentication
         ?string $redirectUri = null,
         ?array $params = null
     ): string {
-        Validate::string($state, 'state');
+        [$state, $redirectUri] = Toolkit::filter([$state, $redirectUri])->string()->trim();
+        [$params] = Toolkit::filter([$params])->array()->trim();
 
-        $redirectUri = $redirectUri ?? (isset($params['redirect_uri']) ? (string) $params['redirect_uri'] : null);
-        $redirectUri = Shortcut::trimNull($redirectUri) ?? $this->configuration->getRedirectUri() ?? null;
+        Toolkit::assert([
+            [$state, \Auth0\SDK\Exception\ArgumentException::missing('state')],
+        ])->isString();
 
-        if ($redirectUri === null) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresReturnUri();
-        }
-
-        $params = Shortcut::mergeArrays(Shortcut::filterArray([
-            'state' => $state,
-            'client_id' => $this->configuration->getClientId(),
-            'audience' => $this->configuration->buildDefaultAudience(),
-            'organization' => $this->configuration->buildDefaultOrganization(),
-            'redirect_uri' => $redirectUri,
-            'scope' => $this->configuration->buildScopeString(),
-            'response_mode' => $this->configuration->getResponseMode(),
-            'response_type' => $this->configuration->getResponseType(),
-        ]), $params);
+        [$redirectUri] = Toolkit::filter([
+            [$redirectUri, isset($params['redirect_uri']) ? (string) $params['redirect_uri'] : null, $this->configuration->getRedirectUri()],
+        ])->array()->first(\Auth0\SDK\Exception\ConfigurationException::requiresRedirectUri());
 
         return sprintf(
             '%s/authorize?%s',
-            $this->configuration->buildDomainUri(),
-            http_build_query($params, '', '&', PHP_QUERY_RFC3986)
+            $this->configuration->formatDomain(),
+            http_build_query(Toolkit::merge([
+                'state' => $state,
+                'client_id' => $this->configuration->getClientId(\Auth0\SDK\Exception\ConfigurationException::requiresClientId()),
+                'audience' => $this->configuration->defaultAudience(),
+                'organization' => $this->configuration->defaultOrganization(),
+                'redirect_uri' => $redirectUri,
+                'scope' => $this->configuration->formatScope(),
+                'response_mode' => $this->configuration->getResponseMode(),
+                'response_type' => $this->configuration->getResponseType(),
+            ], $params), '', '&', PHP_QUERY_RFC3986)
         );
     }
 
     /**
      * Builds and returns a logout URL to terminate an SSO session.
      *
-     * @param string|null                 $returnUri Optional. URI to return to after logging out. Defaults to the SDK's configured redirectUri.
-     * @param array<int|string|null>|null $params    Optional. Additional parameters to include with the request.
+     * @param string|null                 $returnTo Optional. URI to return to after logging out. Defaults to the SDK's configured redirectUri.
+     * @param array<int|string|null>|null $params   Optional. Additional parameters to include with the request.
+     *
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a $returnUri is not configured.
      *
      * @link https://auth0.com/docs/api/authentication#logout
      */
     public function getLogoutLink(
-        ?string $returnUri = null,
+        ?string $returnTo = null,
         ?array $params = null
     ): string {
-        $returnUri = $returnUri ?? (isset($params['returnTo']) ? (string) $params['returnTo'] : null);
-        $returnUri = Shortcut::trimNull($returnUri) ?? $this->configuration->getRedirectUri() ?? null;
+        [$returnTo] = Toolkit::filter([$returnTo])->string()->trim();
+        [$params] = Toolkit::filter([$params])->array()->trim();
 
-        if ($returnUri === null) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresReturnUri();
-        }
-
-        $payload = Shortcut::mergeArrays([
-            'returnTo' => $returnUri,
-            'client_id' => $this->configuration->getClientId(),
-        ], $params);
+        [$returnTo] = Toolkit::filter([
+            [$returnTo, isset($params['returnTo']) ? (string) $params['returnTo'] : null, $this->configuration->getRedirectUri()],
+        ])->array()->first(\Auth0\SDK\Exception\ConfigurationException::requiresRedirectUri());
 
         return sprintf(
             '%s/v2/logout?%s',
-            $this->configuration->buildDomainUri(),
-            http_build_query($payload, '', '&', PHP_QUERY_RFC3986)
+            $this->configuration->formatDomain(),
+            http_build_query(Toolkit::merge([
+                'returnTo' => $returnTo,
+                'client_id' => $this->configuration->getClientId(\Auth0\SDK\Exception\ConfigurationException::requiresClientId()),
+            ], $params), '', '&', PHP_QUERY_RFC3986)
         );
     }
 
@@ -205,8 +242,9 @@ final class Authentication
      * @param array<mixed>|null       $body    Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null  $headers Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When Client Secret is not configured.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#get-code-or-link
      */
@@ -214,34 +252,31 @@ final class Authentication
         ?array $body = null,
         ?array $headers = null
     ): ResponseInterface {
-        if (! $this->configuration->hasClientSecret()) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresClientSecret();
-        }
+        [$body, $headers] = Toolkit::filter([$body, $headers])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'client_id' => $this->configuration->getClientId(),
-            'client_secret' => $this->configuration->getClientSecret(),
-        ], $body);
-
-        return $this->httpClient
+        return $this->getHttpClient()
             ->method('post')
             ->addPath('passwordless', 'start')
-            ->withBody($body)
-            ->withHeaders($headers ?? [])
+            ->withBody(Toolkit::merge([
+                'client_id' => $this->configuration->getClientId(\Auth0\SDK\Exception\ConfigurationException::requiresClientId()),
+                'client_secret' => $this->configuration->getClientSecret(\Auth0\SDK\Exception\ConfigurationException::requiresClientSecret()),
+            ], $body))
+            ->withHeaders($headers)
             ->call();
     }
 
     /**
      * Start passwordless login process for email
      *
-     * @param string                         $email      Email address to use.
-     * @param string                         $type       Use null or "link" to send a link, use "code" to send a verification code.
-     * @param array<string,string|null>|null $params     Optional. Append or override the link parameters (like scope, redirect_uri, protocol, response_type) when you send a link using email.
-     * @param array<int|string>|null         $headers    Optional. Additional headers to send with the API request.
+     * @param string                         $email   Email address to use.
+     * @param string                         $type    Use null or "link" to send a link, use "code" to send a verification code.
+     * @param array<string,string|null>|null $params  Optional. Append or override the link parameters (like scope, redirect_uri, protocol, response_type) when you send a link using email.
+     * @param array<int|string>|null         $headers Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When Client Secret is not configured.
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid `email` or `type` are passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `email` or `type` are passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#get-code-or-link
      */
@@ -251,17 +286,25 @@ final class Authentication
         ?array $params = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::email($email, 'email');
-        Validate::string($type, 'type');
+        [$email, $type] = Toolkit::filter([$email, $type])->string()->trim();
+        [$params, $headers] = Toolkit::filter([$params, $headers])->array()->trim();
 
-        $body = Shortcut::filterArray([
-            'email' => trim($email),
-            'connection' => 'email',
-            'send' => trim($type),
-            'authParams' => $params ?? [],
-        ]);
+        Toolkit::assert([
+            [$email, \Auth0\SDK\Exception\ArgumentException::missing('email')],
+        ])->isEmail();
 
-        return $this->passwordlessStart($body, $headers ?? []);
+        Toolkit::assert([
+            [$type, \Auth0\SDK\Exception\ArgumentException::missing('type')],
+        ])->isString();
+
+        return $this->passwordlessStart(Toolkit::filter([
+            [
+                'email' => $email,
+                'connection' => 'email',
+                'send' => $type,
+                'authParams' => $params,
+            ],
+        ])->array()->trim()[0], $headers);
     }
 
     /**
@@ -270,9 +313,10 @@ final class Authentication
      * @param string                 $phoneNumber Phone number to use.
      * @param array<int|string>|null $headers     Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When Client Secret is not configured.
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $phoneNumber is passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `phoneNumber` is passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#get-code-or-link
      */
@@ -280,14 +324,19 @@ final class Authentication
         string $phoneNumber,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($phoneNumber, 'phoneNumber');
+        [$phoneNumber] = Toolkit::filter([$phoneNumber])->string()->trim();
+        [$headers] = Toolkit::filter([$headers])->array()->trim();
 
-        $body = Shortcut::filterArray([
-            'phone_number' => trim($phoneNumber),
-            'connection' => 'sms',
-        ]);
+        Toolkit::assert([
+            [$phoneNumber, \Auth0\SDK\Exception\ArgumentException::missing('phoneNumber')],
+        ])->isString();
 
-        return $this->passwordlessStart($body, $headers ?? []);
+        return $this->passwordlessStart(Toolkit::filter([
+            [
+                'phone_number' => $phoneNumber,
+                'connection' => 'sms',
+            ],
+        ])->array()->trim()[0], $headers);
     }
 
     /**
@@ -295,20 +344,24 @@ final class Authentication
      *
      * @param string $accessToken Bearer token to use for the request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $accessToken is passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `accessToken` is passed.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#user-profile
      */
     public function userInfo(
         string $accessToken
     ): ResponseInterface {
-        Validate::string($accessToken, 'accessToken');
+        [$accessToken] = Toolkit::filter([$accessToken])->string()->trim();
 
-        return $this->httpClient
+        Toolkit::assert([
+            [$accessToken, \Auth0\SDK\Exception\ArgumentException::missing('accessToken')],
+        ])->isString();
+
+        return $this->getHttpClient()
             ->method('post')
             ->addPath('userinfo')
-            ->withHeader('Authorization', 'Bearer ' . trim($accessToken))
+            ->withHeader('Authorization', 'Bearer ' . ($accessToken ?? ''))
             ->call();
     }
 
@@ -319,8 +372,10 @@ final class Authentication
      * @param array<int|string|null>|null $params    Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null      $headers   Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $grantType is passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `grantType` is passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#get-token
      */
@@ -329,23 +384,22 @@ final class Authentication
         ?array $params = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($grantType, 'grantType');
+        [$grantType] = Toolkit::filter([$grantType])->string()->trim();
+        [$params, $headers] = Toolkit::filter([$params, $headers])->array()->trim();
 
-        if (! $this->configuration->hasClientSecret()) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresClientSecret();
-        }
+        Toolkit::assert([
+            [$grantType, \Auth0\SDK\Exception\ArgumentException::missing('grantType')],
+        ])->isString();
 
-        $params = Shortcut::mergeArrays([
-            'grant_type' => trim($grantType),
-            'client_id' => $this->configuration->getClientId(),
-            'client_secret' => $this->configuration->getClientSecret(),
-        ], $params);
-
-        return $this->httpClient
+        return $this->getHttpClient()
             ->method('post')
             ->addPath('oauth', 'token')
-            ->withHeaders($headers ?? [])
-            ->withFormParams($params)
+            ->withHeaders($headers)
+            ->withFormParams(Toolkit::merge([
+                'grant_type' => $grantType,
+                'client_id' => $this->configuration->getClientId(\Auth0\SDK\Exception\ConfigurationException::requiresClientId()),
+                'client_secret' => $this->configuration->getClientSecret(\Auth0\SDK\Exception\ConfigurationException::requiresClientSecret()),
+            ], $params))
             ->call();
     }
 
@@ -356,27 +410,37 @@ final class Authentication
      * @param string|null $redirectUri  Optional. Redirect URI sent with authorize request. Defaults to the SDK's configured redirectUri.
      * @param string|null $codeVerifier Optional. The clear-text version of the code_challenge from the /authorize call
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $code is passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `code` is passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a redirect uri is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/authentication#authorization-code-flow45
+     * @link https://auth0.com/docs/api/authentication#authorization-code-flow-with-pkce46
      */
     public function codeExchange(
         string $code,
         ?string $redirectUri = null,
         ?string $codeVerifier = null
     ): ResponseInterface {
-        Validate::string($code, 'code');
+        [$code, $redirectUri, $codeVerifier] = Toolkit::filter([$code, $redirectUri, $codeVerifier])->string()->trim();
 
-        $returnUri = Shortcut::trimNull($redirectUri) ?? $this->configuration->getRedirectUri() ?? null;
+        Toolkit::assert([
+            [$code, \Auth0\SDK\Exception\ArgumentException::missing('code')],
+        ])->isString();
 
-        if ($returnUri === null) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresReturnUri();
-        }
+        [$redirectUri] = Toolkit::filter([
+            [$redirectUri, $this->configuration->getRedirectUri()],
+        ])->array()->first(\Auth0\SDK\Exception\ConfigurationException::requiresRedirectUri());
 
-        return $this->oauthToken('authorization_code', Shortcut::filterArray([
-            'redirect_uri' => $returnUri,
-            'code' => trim($code),
-            'code_verifier' => Shortcut::trimNull($codeVerifier),
-        ]));
+        return $this->oauthToken('authorization_code', Toolkit::filter([
+            [
+                'redirect_uri' => $redirectUri,
+                'code' => $code,
+                'code_verifier' => $codeVerifier,
+            ],
+        ])->array()->trim()[0]);
     }
 
     /**
@@ -388,8 +452,13 @@ final class Authentication
      * @param array<int|string|null>|null $params   Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null      $headers  Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $username, $password, or $realm are passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `username`, `password`, or `realm` are passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/authentication#resource-owner-password
+     * @link https://auth0.com/docs/authorization/flows/resource-owner-password-flow
      */
     public function login(
         string $username,
@@ -398,17 +467,20 @@ final class Authentication
         ?array $params = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($username, 'username');
-        Validate::string($password, 'password');
-        Validate::string($realm, 'realm');
+        [$username, $password, $realm] = Toolkit::filter([$username, $password, $realm])->string()->trim();
+        [$params, $headers] = Toolkit::filter([$params, $headers])->array()->trim();
 
-        $params = Shortcut::mergeArrays([
-            'username' => trim($username),
-            'password' => trim($password),
-            'realm' => trim($realm),
-        ], $params);
+        Toolkit::assert([
+            [$username, \Auth0\SDK\Exception\ArgumentException::missing('username')],
+            [$password, \Auth0\SDK\Exception\ArgumentException::missing('password')],
+            [$realm, \Auth0\SDK\Exception\ArgumentException::missing('realm')],
+        ])->isString();
 
-        return $this->oauthToken('http://auth0.com/oauth/grant-type/password-realm', $params, $headers ?? []);
+        return $this->oauthToken('http://auth0.com/oauth/grant-type/password-realm', Toolkit::merge([
+            'username' => $username,
+            'password' => $password,
+            'realm' => $realm,
+        ], $params), $headers);
     }
 
     /**
@@ -419,10 +491,13 @@ final class Authentication
      * @param array<int|string|null>|null $params   Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null      $headers  Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $username or $password are passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `username` or `password` are passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
-     * @link https://auth0.com/docs/api-auth/grant/password
+     * @link https://auth0.com/docs/api/authentication#resource-owner-password
+     * @link https://auth0.com/docs/authorization/flows/resource-owner-password-flow
      */
     public function loginWithDefaultDirectory(
         string $username,
@@ -430,15 +505,18 @@ final class Authentication
         ?array $params = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($username, 'username');
-        Validate::string($password, 'password');
+        [$username, $password] = Toolkit::filter([$username, $password])->string()->trim();
+        [$params, $headers] = Toolkit::filter([$params, $headers])->array()->trim();
 
-        $params = Shortcut::mergeArrays([
-            'username' => trim($username),
-            'password' => trim($password),
-        ], $params);
+        Toolkit::assert([
+            [$username, \Auth0\SDK\Exception\ArgumentException::missing('username')],
+            [$password, \Auth0\SDK\Exception\ArgumentException::missing('password')],
+        ])->isString();
 
-        return $this->oauthToken('password', $params, $headers ?? []);
+        return $this->oauthToken('password', Toolkit::merge([
+            'username' => $username,
+            'password' => $password,
+        ], $params), $headers);
     }
 
     /**
@@ -447,24 +525,22 @@ final class Authentication
      * @param array<int|string|null>|null $params  Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null      $headers Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When Client Secret is not configured.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
-     * @link https://auth0.com/docs/api-auth/grant/client-credentials
+     * @link https://auth0.com/docs/api/authentication#client-credentials-flow
+     * @link https://auth0.com/docs/authorization/flows/client-credentials-flow
      */
     public function clientCredentials(
         ?array $params = null,
         ?array $headers = null
     ): ResponseInterface {
-        if (! $this->configuration->hasClientSecret()) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresClientSecret();
-        }
+        [$params, $headers] = Toolkit::filter([$params, $headers])->array()->trim();
 
-        $params = Shortcut::mergeArrays([
-            'audience' => $this->configuration->buildDefaultAudience(),
-        ], $params);
-
-        return $this->oauthToken('client_credentials', $params, $headers ?? []);
+        return $this->oauthToken('client_credentials', Toolkit::merge([
+            'audience' => $this->configuration->defaultAudience(),
+        ], $params), $headers);
     }
 
     /**
@@ -474,8 +550,10 @@ final class Authentication
      * @param array<int|string|null>|null $params       Optional. Additional parameters to include with the request.
      * @param array<int|string>           $headers      Optional. Additional headers to send with the request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When Client Secret is not configured, or an invalid $refreshToken is passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `refreshToken` is passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client Secret is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#refresh-token
      */
@@ -484,17 +562,16 @@ final class Authentication
         ?array $params = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($refreshToken, 'refreshToken');
+        [$refreshToken] = Toolkit::filter([$refreshToken])->string()->trim();
+        [$params, $headers] = Toolkit::filter([$params, $headers])->array()->trim();
 
-        if (! $this->configuration->hasClientSecret()) {
-            throw \Auth0\SDK\Exception\AuthenticationException::requiresClientSecret();
-        }
+        Toolkit::assert([
+            [$refreshToken, \Auth0\SDK\Exception\ArgumentException::missing('refreshToken')],
+        ])->isString();
 
-        $params = Shortcut::mergeArrays([
-            'refresh_token' => trim($refreshToken),
-        ], $params);
-
-        return $this->oauthToken('refresh_token', $params, $headers ?? []);
+        return $this->oauthToken('refresh_token', Toolkit::merge([
+            'refresh_token' => $refreshToken,
+        ], $params), $headers);
     }
 
     /**
@@ -507,8 +584,9 @@ final class Authentication
      * @param array<mixed>|null      $body       Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null $headers    Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $email, $password, or $connection are passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `email`, `password`, or `connection` are passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#signup
      */
@@ -519,22 +597,25 @@ final class Authentication
         ?array $body = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($email, 'email');
-        Validate::string($password, 'password');
-        Validate::string($connection, 'connection');
+        [$email, $password, $connection] = Toolkit::filter([$email, $password, $connection])->string()->trim();
+        [$body, $headers] = Toolkit::filter([$body, $headers])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'client_id' => $this->configuration->getClientId(),
-            'email' => trim($email),
-            'password' => trim($password),
-            'connection' => trim($connection),
-        ], $body);
+        Toolkit::assert([
+            [$email, \Auth0\SDK\Exception\ArgumentException::missing('email')],
+            [$password, \Auth0\SDK\Exception\ArgumentException::missing('password')],
+            [$connection, \Auth0\SDK\Exception\ArgumentException::missing('connection')],
+        ])->isString();
 
-        return $this->httpClient
+        return $this->getHttpClient()
             ->method('post')
             ->addPath('dbconnections', 'signup')
-            ->withBody($body)
-            ->withHeaders($headers ?? [])
+            ->withBody(Toolkit::merge([
+                'client_id' => $this->configuration->getClientId(\Auth0\SDK\Exception\ConfigurationException::requiresClientId()),
+                'email' => $email,
+                'password' => $password,
+                'connection' => $connection,
+            ], $body))
+            ->withHeaders($headers)
             ->call();
     }
 
@@ -547,8 +628,9 @@ final class Authentication
      * @param array<mixed>|null      $body       Optional. Additional content to include in the body of the API request. See @link for details.
      * @param array<int|string>|null $headers    Optional. Additional headers to send with the API request.
      *
-     * @throws \Auth0\SDK\Exception\AuthenticationException When an invalid $email or $connection are passed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException      When an invalid `email` or `connection` are passed.
+     * @throws \Auth0\SDK\Exception\ConfigurationException When a Client ID is not configured.
+     * @throws \Auth0\SDK\Exception\NetworkException       When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/authentication#change-password
      */
@@ -558,20 +640,23 @@ final class Authentication
         ?array $body = null,
         ?array $headers = null
     ): ResponseInterface {
-        Validate::string($email, 'email');
-        Validate::string($connection, 'connection');
+        [$email, $connection] = Toolkit::filter([$email, $connection])->string()->trim();
+        [$body, $headers] = Toolkit::filter([$body, $headers])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'client_id' => $this->configuration->getClientId(),
-            'email' => trim($email),
-            'connection' => trim($connection),
-        ], $body);
+        Toolkit::assert([
+            [$email, \Auth0\SDK\Exception\ArgumentException::missing('email')],
+            [$connection, \Auth0\SDK\Exception\ArgumentException::missing('connection')],
+        ])->isString();
 
-        return $this->httpClient
+        return $this->getHttpClient()
             ->method('post')
             ->addPath('dbconnections', 'change_password')
-            ->withBody($body)
-            ->withHeaders($headers ?? [])
+            ->withBody(Toolkit::merge([
+                'client_id' => $this->configuration->getClientId(\Auth0\SDK\Exception\ConfigurationException::requiresClientId()),
+                'email' => $email,
+                'connection' => $connection,
+            ], $body))
+            ->withHeaders($headers)
             ->call();
     }
 }

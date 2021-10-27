@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -28,7 +27,8 @@ final class Jobs extends ManagementEndpoint
      * @param array<string,bool|int|string>|null $parameters   Optional.Additional query parameters to pass with the API request. See @link for supported options.
      * @param RequestOptions|null                $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `filePath` or `connectionId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Jobs/post_users_imports
      */
@@ -38,21 +38,21 @@ final class Jobs extends ManagementEndpoint
         ?array $parameters = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($filePath, 'filePath');
-        Validate::string($connectionId, 'connectionId');
+        [$filePath, $connectionId] = Toolkit::filter([$filePath, $connectionId])->string()->trim();
+        [$parameters] = Toolkit::filter([$parameters])->array()->trim();
 
-        $request = $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$filePath, \Auth0\SDK\Exception\ArgumentException::missing('filePath')],
+            [$connectionId, \Auth0\SDK\Exception\ArgumentException::missing('connectionId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('jobs', 'users-imports')
             ->addFile('users', $filePath)
-            ->withFormParam('connection_id', $connectionId);
-
-        if ($parameters !== null && count($parameters) !== 0) {
-            foreach ($parameters as $key => $value) {
-                $request->withFormParam($key, $value);
-            }
-        }
-
-        return $request->withOptions($options)
+            ->withFormParam('connection_id', $connectionId)
+            ->withFormParams($parameters)
+            ->withOptions($options)
             ->call();
     }
 
@@ -71,9 +71,14 @@ final class Jobs extends ManagementEndpoint
         array $body,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::array($body, 'body');
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$body, \Auth0\SDK\Exception\ArgumentException::missing('body')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('jobs', 'users-exports')
             ->withBody((object) $body)
             ->withOptions($options)
@@ -88,7 +93,8 @@ final class Jobs extends ManagementEndpoint
      * @param array<mixed>|null   $body    Optional. Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `userId` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Jobs/post_verification_email
      */
@@ -97,15 +103,21 @@ final class Jobs extends ManagementEndpoint
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($userId, 'userId');
+        [$userId] = Toolkit::filter([$userId])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'user_id' => $userId,
-        ], $body);
+        Toolkit::assert([
+            [$userId, \Auth0\SDK\Exception\ArgumentException::missing('userId')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('jobs', 'verification-email')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'user_id' => $userId,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -119,7 +131,8 @@ final class Jobs extends ManagementEndpoint
      * @param string              $id      Job (by it's ID) to query.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Jobs/get_jobs_by_id
      */
@@ -127,9 +140,14 @@ final class Jobs extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('jobs', $id)
             ->withOptions($options)
             ->call();
@@ -144,7 +162,8 @@ final class Jobs extends ManagementEndpoint
      * @param string              $id      Job (by it's ID) to query.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Jobs/get_errors
      */
@@ -152,9 +171,14 @@ final class Jobs extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('jobs', $id, 'errors')
             ->withOptions($options)
             ->call();

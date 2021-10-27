@@ -36,6 +36,19 @@ final class TransientStoreHandler
     }
 
     /**
+     * Defer saving state changes to destination to improve performance during blocks of changes.
+     *
+     * @param bool $deferring Whether to defer persisting the storage state.
+     *
+     * @codeCoverageIgnore
+     */
+    public function defer(
+        bool $deferring
+    ): void {
+        $this->getStore()->defer($deferring);
+    }
+
+    /**
      * Store a value for a specific key.
      *
      * @param string $key   Key to use.
@@ -113,6 +126,8 @@ final class TransientStoreHandler
      * Generate a random nonce value.
      *
      * @param int $length Length of the generated value, in bytes.
+     *
+     * @codeCoverageIgnore
      */
     private function getNonce(
         int $length = 16

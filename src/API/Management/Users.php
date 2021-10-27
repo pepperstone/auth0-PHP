@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -25,7 +24,8 @@ final class Users extends ManagementEndpoint
      * @param array<mixed>        $body       Configuration for the new User. Some parameters are dependent upon the type of connection. See @link for supported options.
      * @param RequestOptions|null $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `connection` or `body` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/post_users
      */
@@ -34,16 +34,25 @@ final class Users extends ManagementEndpoint
         array $body,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($connection, 'connection');
-        Validate::array($body, 'body');
+        [$connection] = Toolkit::filter([$connection])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        $payload = Shortcut::mergeArrays([
-            'connection' => $connection,
-        ], $body);
+        Toolkit::assert([
+            [$connection, \Auth0\SDK\Exception\ArgumentException::missing('connection')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$body, \Auth0\SDK\Exception\ArgumentException::missing('body')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('users')
-            ->withBody((object) $payload)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'connection' => $connection,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -66,9 +75,12 @@ final class Users extends ManagementEndpoint
         ?array $parameters = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        return $this->getHttpClient()->method('get')
+        [$parameters] = Toolkit::filter([$parameters])->array()->trim();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users')
-            ->withParams($parameters ?? [])
+            ->withParams($parameters)
             ->withOptions($options)
             ->call();
     }
@@ -82,15 +94,23 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User (by their ID) to query.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Users/get_users_by_id
      */
     public function get(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users', $id)
             ->withOptions($options)
             ->call();
@@ -106,7 +126,8 @@ final class Users extends ManagementEndpoint
      * @param array<mixed>        $body    User data to update. See @link for supported options.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `body` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/patch_users_by_id
      */
@@ -115,9 +136,19 @@ final class Users extends ManagementEndpoint
         array $body,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        return $this->getHttpClient()->method('patch')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        Toolkit::assert([
+            [$body, \Auth0\SDK\Exception\ArgumentException::missing('body')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('patch')
             ->addPath('users', $id)
             ->withBody((object) $body)
             ->withOptions($options)
@@ -131,7 +162,8 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID to delete.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/delete_users_by_id
      */
@@ -139,9 +171,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('users', $id)
             ->withOptions($options)
             ->call();
@@ -155,7 +192,8 @@ final class Users extends ManagementEndpoint
      * @param array<mixed>        $body    Additional body content to send with the API request.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `body` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/post_identities
      */
@@ -164,10 +202,19 @@ final class Users extends ManagementEndpoint
         array $body,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::array($body, 'body');
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        Toolkit::assert([
+            [$body, \Auth0\SDK\Exception\ArgumentException::missing('body')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('users', $id, 'identities')
             ->withBody((object) $body)
             ->withOptions($options)
@@ -183,7 +230,8 @@ final class Users extends ManagementEndpoint
      * @param string              $identityId ID of the secondary linked account
      * @param RequestOptions|null $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id`, `provider`, or `identityId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/delete_user_identity_by_user_id
      */
@@ -193,11 +241,16 @@ final class Users extends ManagementEndpoint
         string $identityId,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($provider, 'provider');
-        Validate::string($identityId, 'identityId');
+        [$id, $provider, $identityId] = Toolkit::filter([$id, $provider, $identityId])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$provider, \Auth0\SDK\Exception\ArgumentException::missing('provider')],
+            [$identityId, \Auth0\SDK\Exception\ArgumentException::missing('identityId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('users', $id, 'identities', $provider, $identityId)
             ->withOptions($options)
             ->call();
@@ -213,7 +266,8 @@ final class Users extends ManagementEndpoint
      * @param array<string>       $roles   Array of roles to add.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `roles` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/post_user_roles
      */
@@ -222,10 +276,19 @@ final class Users extends ManagementEndpoint
         array $roles,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::array($roles, 'roles');
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$roles] = Toolkit::filter([$roles])->array()->trim();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        Toolkit::assert([
+            [$roles, \Auth0\SDK\Exception\ArgumentException::missing('roles')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('users', $id, 'roles')
             ->withBody(
                 (object) [
@@ -245,7 +308,8 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID to get roles for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/get_user_roles
      */
@@ -253,9 +317,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users', $id, 'roles')
             ->withOptions($options)
             ->call();
@@ -269,7 +338,8 @@ final class Users extends ManagementEndpoint
      * @param array<string>       $roles   Array of permissions to remove.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `roles` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/delete_user_roles
      */
@@ -278,10 +348,19 @@ final class Users extends ManagementEndpoint
         array $roles,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::array($roles, 'roles');
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$roles] = Toolkit::filter([$roles])->array()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        Toolkit::assert([
+            [$roles, \Auth0\SDK\Exception\ArgumentException::missing('roles')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('users', $id, 'roles')
             ->withBody(
                 (object) [
@@ -300,9 +379,8 @@ final class Users extends ManagementEndpoint
      * @param array<array>        $permissions Array of permissions to add.
      * @param RequestOptions|null $options     Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\ArgumentException When the user_id parameter is empty or is not a string.
-     * @throws \Auth0\SDK\Exception\ArgumentException When the permissions parameter is malformed.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `permissions` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/post_permissions
      */
@@ -311,20 +389,23 @@ final class Users extends ManagementEndpoint
         array $permissions,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::permissions($permissions);
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$permissions] = Toolkit::filter([$permissions])->array()->trim();
 
-        $payload = [
-            'permissions' => [],
-        ];
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
 
-        foreach ($permissions as $permission) {
-            $payload['permissions'][] = (object) $permission;
-        }
+        Toolkit::assert([
+            [$permissions, \Auth0\SDK\Exception\ArgumentException::missing('permissions')],
+        ])->isPermissions();
 
-        return $this->getHttpClient()->method('post')
+        [$permissions] = Toolkit::filter([$permissions])->array()->permissions();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('users', $id, 'permissions')
-            ->withBody((object) $payload)
+            ->withBody($permissions)
             ->withOptions($options)
             ->call();
     }
@@ -336,6 +417,7 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID to get permissions for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/get_permissions
@@ -344,9 +426,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users', $id, 'permissions')
             ->withOptions($options)
             ->call();
@@ -360,8 +447,7 @@ final class Users extends ManagementEndpoint
      * @param array<array>        $permissions Array of permissions to remove.
      * @param RequestOptions|null $options     Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\ArgumentException When the user_id parameter is empty or is not a string.
-     * @throws \Auth0\SDK\Exception\ArgumentException When the permissions parameter is malformed.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `permissions` are provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/delete_permissions
@@ -371,20 +457,23 @@ final class Users extends ManagementEndpoint
         array $permissions,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::permissions($permissions);
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$permissions] = Toolkit::filter([$permissions])->array()->trim();
 
-        $payload = [
-            'permissions' => [],
-        ];
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
 
-        foreach ($permissions as $permission) {
-            $payload['permissions'][] = (object) $permission;
-        }
+        Toolkit::assert([
+            [$permissions, \Auth0\SDK\Exception\ArgumentException::missing('permissions')],
+        ])->isPermissions();
 
-        return $this->getHttpClient()->method('delete')
+        [$permissions] = Toolkit::filter([$permissions])->array()->permissions();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('users', $id, 'permissions')
-            ->withBody((object) $payload)
+            ->withBody($permissions)
             ->withOptions($options)
             ->call();
     }
@@ -396,8 +485,8 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID to get logs entries for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\ArgumentException When the user_id parameter is empty or is not a string.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/get_logs_by_user
      */
@@ -405,9 +494,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users', $id, 'logs')
             ->withOptions($options)
             ->call();
@@ -420,16 +514,23 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID to get organization entries for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\ArgumentException When the user_id parameter is empty or is not a string.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Users/get_user_organizations
      */
     public function getOrganizations(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users', $id, 'organizations')
             ->withOptions($options)
             ->call();
@@ -442,7 +543,8 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID to query.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/get_enrollments
      */
@@ -450,9 +552,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('users', $id, 'enrollments')
             ->withOptions($options)
             ->call();
@@ -465,8 +572,8 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID of the user to regenerate a multi-factor authentication recovery code for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\ArgumentException When the user_id parameter is empty or is not a string.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/post_recovery_code_regeneration
      */
@@ -474,9 +581,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('users', $id, 'recovery-code-regeneration')
             ->withOptions($options)
             ->call();
@@ -489,8 +601,8 @@ final class Users extends ManagementEndpoint
      * @param string              $id      User ID of the user to invalidate all remembered browsers and authentication factors for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\ArgumentException When the user_id parameter is empty or is not a string.
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/post_invalidate_remember_browser
      */
@@ -498,9 +610,14 @@ final class Users extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('users', $id, 'multifactor', 'actions', 'invalidate-remember-browser')
             ->withOptions($options)
             ->call();
@@ -515,6 +632,7 @@ final class Users extends ManagementEndpoint
      * @param string              $provider Multifactor provider to delete.
      * @param RequestOptions|null $options  Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `provider` are provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Users/delete_multifactor_by_provider
@@ -524,10 +642,15 @@ final class Users extends ManagementEndpoint
         string $provider,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($provider, 'provider');
+        [$id, $provider] = Toolkit::filter([$id, $provider])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$provider, \Auth0\SDK\Exception\ArgumentException::missing('provider')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('users', $id, 'multifactor', $provider)
             ->withOptions($options)
             ->call();

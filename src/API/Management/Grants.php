@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -32,9 +31,12 @@ final class Grants extends ManagementEndpoint
         ?array $parameters = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        return $this->getHttpClient()->method('get')
+        [$parameters] = Toolkit::filter([$parameters])->array()->trim();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('grants')
-            ->withParams($parameters ?? [])
+            ->withParams($parameters)
             ->withOptions($options)
             ->call();
     }
@@ -47,7 +49,8 @@ final class Grants extends ManagementEndpoint
      * @param array<string,int|string|null>|null $parameters Optional. Additional query parameters to pass with the API request. See @link for supported options.
      * @param RequestOptions|null                $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `clientId` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Grants/get_grants
      */
@@ -56,13 +59,16 @@ final class Grants extends ManagementEndpoint
         ?array $parameters = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($clientId, 'clientId');
+        [$clientId] = Toolkit::filter([$clientId])->string()->trim();
+        [$parameters] = Toolkit::filter([$parameters])->array()->trim();
 
-        $parameters = Shortcut::mergeArrays([
+        Toolkit::assert([
+            [$clientId, \Auth0\SDK\Exception\ArgumentException::missing('clientId')],
+        ])->isString();
+
+        return $this->getAll(Toolkit::merge([
             'client_id' => $clientId,
-        ], $parameters);
-
-        return $this->getAll($parameters, $options);
+        ], $parameters), $options);
     }
 
     /**
@@ -73,7 +79,8 @@ final class Grants extends ManagementEndpoint
      * @param array<string,int|string|null>|null $parameters Optional. Additional query parameters to pass with the API request. See @link for supported options.
      * @param RequestOptions|null                $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `audience` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Grants/get_grants
      */
@@ -82,13 +89,16 @@ final class Grants extends ManagementEndpoint
         ?array $parameters = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($audience, 'audience');
+        [$audience] = Toolkit::filter([$audience])->string()->trim();
+        [$parameters] = Toolkit::filter([$parameters])->array()->trim();
 
-        $parameters = Shortcut::mergeArrays([
+        Toolkit::assert([
+            [$audience, \Auth0\SDK\Exception\ArgumentException::missing('audience')],
+        ])->isString();
+
+        return $this->getAll(Toolkit::merge([
             'audience' => $audience,
-        ], $parameters ?? []);
-
-        return $this->getAll($parameters, $options);
+        ], $parameters), $options);
     }
 
     /**
@@ -99,6 +109,7 @@ final class Grants extends ManagementEndpoint
      * @param array<string,int|string|null>|null $parameters Optional. Additional query parameters to pass with the API request. See @link for supported options.
      * @param RequestOptions|null                $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `userId` is provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Grants/get_grants
@@ -108,13 +119,16 @@ final class Grants extends ManagementEndpoint
         ?array $parameters = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($userId, 'userId');
+        [$userId] = Toolkit::filter([$userId])->string()->trim();
+        [$parameters] = Toolkit::filter([$parameters])->array()->trim();
 
-        $parameters = Shortcut::mergeArrays([
+        Toolkit::assert([
+            [$userId, \Auth0\SDK\Exception\ArgumentException::missing('userId')],
+        ])->isString();
+
+        return $this->getAll(Toolkit::merge([
             'user_id' => $userId,
-        ], $parameters);
-
-        return $this->getAll($parameters, $options);
+        ], $parameters), $options);
     }
 
     /**
@@ -124,6 +138,7 @@ final class Grants extends ManagementEndpoint
      * @param string              $id      Grant ID to delete a single Grant or User ID to delete all Grants for a User.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Grants/delete_grants_by_id
@@ -132,9 +147,14 @@ final class Grants extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('grants', $id)
             ->withOptions($options)
             ->call();

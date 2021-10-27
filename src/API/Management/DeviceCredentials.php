@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -27,7 +26,8 @@ final class DeviceCredentials extends ManagementEndpoint
      * @param array<mixed>|null   $body       Optional. Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null $options    Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `deviceName`, `type`, `value`, or `deviceId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Device_Credentials/post_device_credentials
      */
@@ -39,21 +39,27 @@ final class DeviceCredentials extends ManagementEndpoint
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($deviceName, 'deviceName');
-        Validate::string($type, 'type');
-        Validate::string($value, 'value');
-        Validate::string($deviceId, 'deviceId');
+        [$deviceName, $type, $value, $deviceId] = Toolkit::filter([$deviceName, $type, $value, $deviceId])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'device_name' => $deviceName,
-            'type' => $type,
-            'value' => $value,
-            'device_id' => $deviceId,
-        ], $body);
+        Toolkit::assert([
+            [$deviceName, \Auth0\SDK\Exception\ArgumentException::missing('deviceName')],
+            [$type, \Auth0\SDK\Exception\ArgumentException::missing('type')],
+            [$value, \Auth0\SDK\Exception\ArgumentException::missing('value')],
+            [$deviceId, \Auth0\SDK\Exception\ArgumentException::missing('deviceId')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('device-credentials')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'device_name' => $deviceName,
+                    'type' => $type,
+                    'value' => $value,
+                    'device_id' => $deviceId,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -67,7 +73,8 @@ final class DeviceCredentials extends ManagementEndpoint
      * @param string|null         $type     Optional. Type of credentials to retrieve. Must be `public_key`, `refresh_token` or `rotating_refresh_token`. The property will default to `refresh_token` when paging is requested
      * @param RequestOptions|null $options  Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `userId` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Device_Credentials/get_device_credentials
      */
@@ -77,23 +84,24 @@ final class DeviceCredentials extends ManagementEndpoint
         ?string $type = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($userId, 'userId');
+        [$userId, $clientId, $type] = Toolkit::filter([$userId, $clientId, $type])->string()->trim();
 
-        $payload = [
-            'user_id' => $userId,
-        ];
+        Toolkit::assert([
+            [$userId, \Auth0\SDK\Exception\ArgumentException::missing('userId')],
+            [$clientId, \Auth0\SDK\Exception\ArgumentException::missing('clientId')],
+            [$type, \Auth0\SDK\Exception\ArgumentException::missing('type')],
+        ])->isString();
 
-        if ($clientId !== null) {
-            $payload['client_id'] = $clientId;
-        }
-
-        if ($type !== null) {
-            $payload['type'] = $type;
-        }
-
-        return $this->getHttpClient()->method('get')
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('device-credentials')
-            ->withParams($payload)
+            ->withParams(Toolkit::filter([
+                [
+                    'user_id' => $userId,
+                    'client_id' => $clientId,
+                    'type' => $type,
+                ],
+            ])->array()->trim()[0])
             ->withOptions($options)
             ->call();
     }
@@ -105,7 +113,8 @@ final class DeviceCredentials extends ManagementEndpoint
      * @param string              $id      ID of the device credential to delete.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Device_Credentials/delete_device_credentials_by_id
      */
@@ -113,9 +122,14 @@ final class DeviceCredentials extends ManagementEndpoint
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('device-credentials', $id)
             ->withOptions($options)
             ->call();

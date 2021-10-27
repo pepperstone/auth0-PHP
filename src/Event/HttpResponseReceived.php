@@ -14,14 +14,14 @@ final class HttpResponseReceived implements Auth0Event
     private RequestInterface $httpRequest;
 
     public function __construct(
-        ResponseInterface &$httpResponse,
+        ResponseInterface $httpResponse,
         RequestInterface $httpRequest
     ) {
-        $this->httpResponse = & $httpResponse;
+        $this->httpResponse = $httpResponse;
         $this->httpRequest = $httpRequest;
     }
 
-    public function &get(): ResponseInterface
+    public function get(): ResponseInterface
     {
         return $this->httpResponse;
     }
@@ -32,9 +32,9 @@ final class HttpResponseReceived implements Auth0Event
     }
 
     public function set(
-        ResponseInterface &$httpResponse
+        ResponseInterface $httpResponse
     ): self {
-        $this->httpResponse = & $httpResponse;
+        $this->httpResponse = $httpResponse;
         return $this;
     }
 }

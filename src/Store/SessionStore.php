@@ -6,7 +6,7 @@ namespace Auth0\SDK\Store;
 
 use Auth0\SDK\Configuration\SdkConfiguration;
 use Auth0\SDK\Contract\StoreInterface;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 
 /**
  * Class SessionStore
@@ -27,19 +27,38 @@ final class SessionStore implements StoreInterface
     /**
      * SessionStore constructor.
      *
-     * @param SdkConfiguration $configuration   Required. Base configuration options for the SDK. See the SdkConfiguration class constructor for options.
-     * @param string           $sessionPrefix   Optional. A string to prefix session keys with.
+     * @param SdkConfiguration $configuration Base configuration options for the SDK. See the SdkConfiguration class constructor for options.
+     * @param string           $sessionPrefix A string to prefix session keys with.
      */
     public function __construct(
-        SdkConfiguration &$configuration,
+        SdkConfiguration $configuration,
         string $sessionPrefix = 'auth0'
     ) {
-        Validate::string($sessionPrefix, 'sessionPrefix');
+        [$sessionPrefix] = Toolkit::filter([$sessionPrefix])->string()->trim();
 
-        $this->configuration = & $configuration;
-        $this->sessionPrefix = trim($sessionPrefix);
+        Toolkit::assert([
+            [$sessionPrefix, \Auth0\SDK\Exception\ArgumentException::missing('sessionPrefix')],
+        ])->isString();
+
+        $this->configuration = $configuration;
+        $this->sessionPrefix = $sessionPrefix ?? 'auth0';
 
         $this->start();
+    }
+
+    /**
+     * This has no effect when using sessions as the storage medium.
+     *
+     * @param bool $deferring Whether to defer persisting the storage state.
+     *
+     * @codeCoverageIgnore
+     *
+     * @phpstan-ignore-next-line
+     */
+    public function defer(
+        bool $deferring
+    ): void {
+        return;
     }
 
     /**
@@ -52,8 +71,6 @@ final class SessionStore implements StoreInterface
         string $key,
         $value
     ): void {
-        Validate::string($key, 'key');
-
         $_SESSION[$this->getSessionName($key)] = $value;
     }
 
@@ -70,8 +87,6 @@ final class SessionStore implements StoreInterface
         string $key,
         $default = null
     ) {
-        Validate::string($key, 'key');
-
         $keyName = $this->getSessionName($key);
 
         if (isset($_SESSION[$keyName])) {
@@ -84,12 +99,12 @@ final class SessionStore implements StoreInterface
     /**
      * Removes all persisted values.
      */
-    public function deleteAll(): void
+    public function purge(): void
     {
         $session = $_SESSION;
         $prefix = $this->sessionPrefix . '_';
 
-        while (current($session)) {
+        while (key($session)) {
             $sessionKey = key($session);
 
             if (is_string($sessionKey) && mb_substr($sessionKey, 0, strlen($prefix)) === $prefix) {
@@ -108,8 +123,6 @@ final class SessionStore implements StoreInterface
     public function delete(
         string $key
     ): void {
-        Validate::string($key, 'key');
-
         unset($_SESSION[$this->getSessionName($key)]);
     }
 
@@ -121,7 +134,13 @@ final class SessionStore implements StoreInterface
     public function getSessionName(
         string $key
     ): string {
-        return $this->sessionPrefix . '_' . trim($key);
+        [$key] = Toolkit::filter([$key])->string()->trim();
+
+        Toolkit::assert([
+            [$key, \Auth0\SDK\Exception\ArgumentException::missing('key')],
+        ])->isString();
+
+        return $this->sessionPrefix . '_' . ($key ?? '');
     }
 
     /**
@@ -132,14 +151,18 @@ final class SessionStore implements StoreInterface
         $sessionId = session_id();
 
         if ($sessionId === '' || $sessionId === false) {
-            session_set_cookie_params([
-                'lifetime' => $this->configuration->getCookieExpires(),
-                'domain' => $this->configuration->getCookieDomain(),
-                'path' => $this->configuration->getCookiePath(),
-                'secure' => $this->configuration->getCookieSecure(),
-                'httponly' => true,
-                'samesite' => $this->configuration->getResponseMode() === 'form_post' ? 'None' : 'Lax',
-            ]);
+            // @codeCoverageIgnoreStart
+            if (! defined('AUTH0_TESTS_DIR')) {
+                session_set_cookie_params([
+                    'lifetime' => $this->configuration->getCookieExpires(),
+                    'domain' => $this->configuration->getCookieDomain(),
+                    'path' => $this->configuration->getCookiePath(),
+                    'secure' => $this->configuration->getCookieSecure(),
+                    'httponly' => true,
+                    'samesite' => $this->configuration->getResponseMode() === 'form_post' ? 'None' : 'Lax',
+                ]);
+            }
+            // @codeCoverageIgnoreEnd
 
             session_register_shutdown();
 

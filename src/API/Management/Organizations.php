@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -21,14 +20,17 @@ final class Organizations extends ManagementEndpoint
      * Create an organization.
      * Required scope: `create:organizations`
      *
-     * @param string              $name        The name of the Organization. Cannot be changed later.
+     * @param string              $name        The name of the Organization.
      * @param string              $displayName The displayed name of the Organization.
      * @param array<mixed>|null   $branding    Optional. An array containing branding customizations for the organization.
      * @param array<mixed>|null   $metadata    Optional. Additional metadata to store about the organization.
      * @param array<mixed>|null   $body        Optional. Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null $options     Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `name` or `displayName` are provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/post_organizations
      */
     public function create(
         string $name,
@@ -38,19 +40,26 @@ final class Organizations extends ManagementEndpoint
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($name, 'name');
-        Validate::string($displayName, 'displayName');
+        [$name, $displayName] = Toolkit::filter([$name, $displayName])->string()->trim();
+        [$branding, $metadata, $body] = Toolkit::filter([$branding, $metadata, $body])->array()->trim();
+        [$branding, $metadata] = Toolkit::filter([$branding, $metadata])->array()->object();
 
-        $body = Shortcut::mergeArrays([
-            'name' => $name,
-            'display_name' => $displayName,
-            'branding' => Shortcut::nullifyEmptyArrayAsObject($branding),
-            'metadata' => Shortcut::nullifyEmptyArrayAsObject($metadata),
-        ], $body);
+        Toolkit::assert([
+            [$name, \Auth0\SDK\Exception\ArgumentException::missing('name')],
+            [$displayName, \Auth0\SDK\Exception\ArgumentException::missing('displayName')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('organizations')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'name' => $name,
+                    'display_name' => $displayName,
+                    'branding' => $branding,
+                    'metadata' => $metadata,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -62,11 +71,14 @@ final class Organizations extends ManagementEndpoint
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_organizations
      */
     public function getAll(
         ?RequestOptions $options = null
     ): ResponseInterface {
-        return $this->getHttpClient()->method('get')
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations')
             ->withOptions($options)
             ->call();
@@ -79,15 +91,23 @@ final class Organizations extends ManagementEndpoint
      * @param string              $id      Organization (by ID) to retrieve details for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_organizations_by_id
      */
     public function get(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id)
             ->withOptions($options)
             ->call();
@@ -100,15 +120,23 @@ final class Organizations extends ManagementEndpoint
      * @param string              $name    Organization (by name parameter provided during creation) to retrieve details for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `name` is provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_name_by_name
      */
     public function getByName(
         string $name,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($name, 'name');
+        [$name] = Toolkit::filter([$name])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$name, \Auth0\SDK\Exception\ArgumentException::missing('name')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', 'name', $name)
             ->withOptions($options)
             ->call();
@@ -119,34 +147,47 @@ final class Organizations extends ManagementEndpoint
      * Required scope: `update:organizations`
      *
      * @param string               $id          Organization (by ID) to update.
+     * @param string               $name        The name of the Organization.
      * @param string               $displayName The displayed name of the Organization.
      * @param array<mixed>|null    $branding    Optional. An array containing branding customizations for the organization.
      * @param array<mixed>|null    $metadata    Optional. Additional metadata to store about the organization.
      * @param array<mixed>|null    $body        Optional. Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null  $options     Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `displayName` are provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/patch_organizations_by_id
      */
     public function update(
         string $id,
+        string $name,
         string $displayName,
         ?array $branding = null,
         ?array $metadata = null,
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($displayName, 'displayName');
+        [$id, $name, $displayName] = Toolkit::filter([$id, $name, $displayName])->string()->trim();
+        [$branding, $metadata, $body] = Toolkit::filter([$branding, $metadata, $body])->array()->trim();
+        [$branding, $metadata] = Toolkit::filter([$branding, $metadata])->array()->object();
 
-        $body = Shortcut::mergeArrays([
-            'display_name' => $displayName,
-            'branding' => Shortcut::nullifyEmptyArrayAsObject($branding),
-            'metadata' => Shortcut::nullifyEmptyArrayAsObject($metadata),
-        ], $body);
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$displayName, \Auth0\SDK\Exception\ArgumentException::missing('displayName')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('patch')
+        return $this->getHttpClient()
+            ->method('patch')
             ->addPath('organizations', $id)
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'name' => $name,
+                    'display_name' => $displayName,
+                    'branding' => $branding,
+                    'metadata' => $metadata,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -158,15 +199,23 @@ final class Organizations extends ManagementEndpoint
      * @param string              $id      Organization (by ID) to delete.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/delete_organizations_by_id
      */
     public function delete(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('organizations', $id)
             ->withOptions($options)
             ->call();
@@ -181,7 +230,10 @@ final class Organizations extends ManagementEndpoint
      * @param array<mixed>        $body         Additional body content to send with the API request. See @link for supported options.
      * @param RequestOptions|null $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `connectionId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/post_enabled_connections
      */
     public function addEnabledConnection(
         string $id,
@@ -189,16 +241,26 @@ final class Organizations extends ManagementEndpoint
         array $body,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($connectionId, 'connectionId');
+        [$id, $connectionId] = Toolkit::filter([$id, $connectionId])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'connection_id' => $connectionId,
-        ], $body);
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$connectionId, \Auth0\SDK\Exception\ArgumentException::missing('connectionId')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$body, \Auth0\SDK\Exception\ArgumentException::missing('body')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('organizations', $id, 'enabled_connections')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'connection_id' => $connectionId,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -210,15 +272,23 @@ final class Organizations extends ManagementEndpoint
      * @param string              $id      Organization (by ID) to list connections of.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_enabled_connections
      */
     public function getEnabledConnections(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id, 'enabled_connections')
             ->withOptions($options)
             ->call();
@@ -232,17 +302,25 @@ final class Organizations extends ManagementEndpoint
      * @param string              $connectionId Connection (by ID) to retrieve details for.
      * @param RequestOptions|null $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `connectionId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_enabled_connections_by_connectionId
      */
     public function getEnabledConnection(
         string $id,
         string $connectionId,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($connectionId, 'connectionId');
+        [$id, $connectionId] = Toolkit::filter([$id, $connectionId])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$connectionId, \Auth0\SDK\Exception\ArgumentException::missing('connectionId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id, 'enabled_connections', $connectionId)
             ->withOptions($options)
             ->call();
@@ -257,7 +335,10 @@ final class Organizations extends ManagementEndpoint
      * @param array<mixed>        $body         Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `connectionId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/patch_enabled_connections_by_connectionId
      */
     public function updateEnabledConnection(
         string $id,
@@ -265,10 +346,16 @@ final class Organizations extends ManagementEndpoint
         array $body,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($connectionId, 'connectionId');
+        [$id, $connectionId] = Toolkit::filter([$id, $connectionId])->string()->trim();
+        [$body] = Toolkit::filter([$body])->array()->trim();
 
-        return $this->getHttpClient()->method('patch')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$connectionId, \Auth0\SDK\Exception\ArgumentException::missing('connectionId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('patch')
             ->addPath('organizations', $id, 'enabled_connections', $connectionId)
             ->withBody((object) $body)
             ->withOptions($options)
@@ -283,17 +370,25 @@ final class Organizations extends ManagementEndpoint
      * @param string              $connectionId Connection (by ID) to remove from organization.
      * @param RequestOptions|null $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `connectionId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/delete_enabled_connections_by_connectionId
      */
     public function removeEnabledConnection(
         string $id,
         string $connectionId,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($connectionId, 'connectionId');
+        [$id, $connectionId] = Toolkit::filter([$id, $connectionId])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$connectionId, \Auth0\SDK\Exception\ArgumentException::missing('connectionId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('organizations', $id, 'enabled_connections', $connectionId)
             ->withOptions($options)
             ->call();
@@ -307,23 +402,35 @@ final class Organizations extends ManagementEndpoint
      * @param array<string>       $members One or more users (by ID) to add from the organization.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `members` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/post_members
      */
     public function addMembers(
         string $id,
         array $members,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::array($members, 'members');
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$members] = Toolkit::filter([$members])->array()->trim();
 
-        $payload = [
-            'members' => $members,
-        ];
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$members, \Auth0\SDK\Exception\ArgumentException::missing('members')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('organizations', $id, 'members')
-            ->withBody((object) $payload)
+            ->withBody(
+                (object) [
+                    'members' => $members,
+                ]
+            )
             ->withOptions($options)
             ->call();
     }
@@ -335,15 +442,23 @@ final class Organizations extends ManagementEndpoint
      * @param string              $id      Organization (by ID) to list members of.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_members
      */
     public function getMembers(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id, 'members')
             ->withOptions($options)
             ->call();
@@ -357,23 +472,35 @@ final class Organizations extends ManagementEndpoint
      * @param array<string>       $members One or more users (by ID) to remove from the organization.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `members` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/delete_members
      */
     public function removeMembers(
         string $id,
         array $members,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::array($members, 'members');
+        [$id] = Toolkit::filter([$id])->string()->trim();
+        [$members] = Toolkit::filter([$members])->array()->trim();
 
-        $payload = [
-            'members' => $members,
-        ];
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$members, \Auth0\SDK\Exception\ArgumentException::missing('members')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('organizations', $id, 'members')
-            ->withBody($payload)
+            ->withBody(
+                (object) [
+                    'members' => $members,
+                ]
+            )
             ->withOptions($options)
             ->call();
     }
@@ -387,7 +514,10 @@ final class Organizations extends ManagementEndpoint
      * @param array<string>       $roles   One or more roles (by ID) to add to the user.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id`, `userId`, or `roles` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/post_organization_member_roles
      */
     public function addMemberRoles(
         string $id,
@@ -395,17 +525,26 @@ final class Organizations extends ManagementEndpoint
         array $roles,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($userId, 'userId');
-        Validate::array($roles, 'roles');
+        [$id, $userId] = Toolkit::filter([$id, $userId])->string()->trim();
+        [$roles] = Toolkit::filter([$roles])->array()->trim();
 
-        $payload = [
-            'roles' => $roles,
-        ];
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$userId, \Auth0\SDK\Exception\ArgumentException::missing('userId')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$roles, \Auth0\SDK\Exception\ArgumentException::missing('roles')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('organizations', $id, 'members', $userId, 'roles')
-            ->withBody((object) $payload)
+            ->withBody(
+                (object) [
+                    'roles' => $roles,
+                ]
+            )
             ->withOptions($options)
             ->call();
     }
@@ -418,17 +557,25 @@ final class Organizations extends ManagementEndpoint
      * @param string              $userId  User (by ID) to add role to.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `userId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_organization_member_roles
      */
     public function getMemberRoles(
         string $id,
         string $userId,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($userId, 'userId');
+        [$id, $userId] = Toolkit::filter([$id, $userId])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$userId, \Auth0\SDK\Exception\ArgumentException::missing('userId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id, 'members', $userId, 'roles')
             ->withOptions($options)
             ->call();
@@ -443,7 +590,10 @@ final class Organizations extends ManagementEndpoint
      * @param array<string>       $roles   One or more roles (by ID) to remove from the user.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id`, `userId`, or `roles` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/delete_organization_member_roles
      */
     public function removeMemberRoles(
         string $id,
@@ -451,17 +601,26 @@ final class Organizations extends ManagementEndpoint
         array $roles,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($userId, 'userId');
-        Validate::array($roles, 'roles');
+        [$id, $userId] = Toolkit::filter([$id, $userId])->string()->trim();
+        [$roles] = Toolkit::filter([$roles])->array()->trim();
 
-        $payload = [
-            'roles' => $roles,
-        ];
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$userId, \Auth0\SDK\Exception\ArgumentException::missing('userId')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$roles, \Auth0\SDK\Exception\ArgumentException::missing('roles')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('organizations', $id, 'members', $userId, 'roles')
-            ->withBody($payload)
+            ->withBody(
+                (object) [
+                    'roles' => $roles,
+                ]
+            )
             ->withOptions($options)
             ->call();
     }
@@ -479,7 +638,10 @@ final class Organizations extends ManagementEndpoint
      * @param array<mixed>|null       $body     Optional. Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null     $options  Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id`, `clientId`, `inviter`, or `invitee` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/post_invitations
      */
     public function createInvitation(
         string $id,
@@ -489,10 +651,18 @@ final class Organizations extends ManagementEndpoint
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($clientId, 'clientId');
-        Validate::array($inviter, 'inviter');
-        Validate::array($invitee, 'invitee');
+        [$id, $clientId] = Toolkit::filter([$id, $clientId])->string()->trim();
+        [$inviter, $invitee, $body] = Toolkit::filter([$inviter, $invitee, $body])->array()->trim();
+
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$clientId, \Auth0\SDK\Exception\ArgumentException::missing('clientId')],
+        ])->isString();
+
+        Toolkit::assert([
+            [$inviter, \Auth0\SDK\Exception\ArgumentException::missing('inviter')],
+            [$invitee, \Auth0\SDK\Exception\ArgumentException::missing('invitee')],
+        ])->isArray();
 
         if (! isset($inviter['name'])) {
             throw \Auth0\SDK\Exception\ArgumentException::missing('inviter.name');
@@ -502,15 +672,16 @@ final class Organizations extends ManagementEndpoint
             throw \Auth0\SDK\Exception\ArgumentException::missing('invitee.email');
         }
 
-        $body = Shortcut::mergeArrays([
-            'client_id' => $clientId,
-            'inviter' => (object) $inviter,
-            'invitee' => (object) $invitee,
-        ], $body);
-
-        return $this->getHttpClient()->method('post')
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('organizations', $id, 'invitations')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'client_id' => $clientId,
+                    'inviter' => (object) $inviter,
+                    'invitee' => (object) $invitee,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -522,15 +693,23 @@ final class Organizations extends ManagementEndpoint
      * @param string              $id      Organization (by ID) to list invitations for.
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` is provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/get_invitations
      */
     public function getInvitations(
         string $id,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
+        [$id] = Toolkit::filter([$id])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id, 'invitations')
             ->withOptions($options)
             ->call();
@@ -544,17 +723,25 @@ final class Organizations extends ManagementEndpoint
      * @param string              $invitationId Invitation (by ID) to request.
      * @param RequestOptions|null $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `invitationId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * https://auth0.com/docs/api/management/v2#!/Organizations/get_invitations_by_invitation_id
      */
     public function getInvitation(
         string $id,
         string $invitationId,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($invitationId, 'invitationId');
+        [$id, $invitationId] = Toolkit::filter([$id, $invitationId])->string()->trim();
 
-        return $this->getHttpClient()->method('get')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$invitationId, \Auth0\SDK\Exception\ArgumentException::missing('invitationId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('organizations', $id, 'invitations', $invitationId)
             ->withOptions($options)
             ->call();
@@ -568,17 +755,25 @@ final class Organizations extends ManagementEndpoint
      * @param string              $invitationId Invitation (by ID) to request.
      * @param RequestOptions|null $options      Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `id` or `invitationId` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
+     *
+     * @link https://auth0.com/docs/api/management/v2#!/Organizations/delete_invitations_by_invitation_id
      */
     public function deleteInvitation(
         string $id,
         string $invitationId,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($id, 'id');
-        Validate::string($invitationId, 'invitation');
+        [$id, $invitationId] = Toolkit::filter([$id, $invitationId])->string()->trim();
 
-        return $this->getHttpClient()->method('delete')
+        Toolkit::assert([
+            [$id, \Auth0\SDK\Exception\ArgumentException::missing('id')],
+            [$invitationId, \Auth0\SDK\Exception\ArgumentException::missing('invitationId')],
+        ])->isString();
+
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('organizations', $id, 'invitations', $invitationId)
             ->withOptions($options)
             ->call();

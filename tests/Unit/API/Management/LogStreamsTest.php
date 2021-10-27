@@ -2,96 +2,88 @@
 
 declare(strict_types=1);
 
-namespace Auth0\Tests\Unit\API\Management;
+uses()->group('management', 'management.log_streams');
 
-use Auth0\Tests\Utilities\MockManagementApi;
-use PHPUnit\Framework\TestCase;
+beforeEach(function(): void {
+    $this->endpoint = $this->api->mock()->logStreams();
+});
 
-class LogStreamsTest extends TestCase
-{
-    public function testGetAll(): void
-    {
-        $api = new MockManagementApi();
+test('getAll() issues an appropriate request', function(): void {
+    $this->endpoint->getAll();
 
-        $api->mock()->logStreams()->getAll();
+    expect($this->api->getRequestMethod())->toEqual('GET');
+    expect($this->api->getRequestUrl())->toStartWith('https://api.test.local/api/v2/log-streams');
+});
 
-        $this->assertEquals('GET', $api->getRequestMethod());
-        $this->assertStringStartsWith('https://api.test.local/api/v2/log-streams', $api->getRequestUrl());
-    }
+test('get() issues an appropriate request', function(): void {
+    $this->endpoint->get('123');
 
-    public function testGet(): void
-    {
-        $api = new MockManagementApi();
+    expect($this->api->getRequestMethod())->toEqual('GET');
+    expect($this->api->getRequestUrl())->toStartWith('https://api.test.local/api/v2/log-streams/123');
+});
 
-        $api->mock()->logStreams()->get('123');
+test('create() issues an appropriate request', function(): void {
+    $mock = (object) [
+        'type' => uniqid(),
+        'sink' => [
+            'httpEndpoint' => uniqid(),
+            'httpContentFormat' => uniqid(),
+            'httpContentType' => uniqid(),
+            'httpAuthorization' => uniqid(),
+        ],
+        'name' => uniqid(),
+    ];
 
-        $this->assertEquals('GET', $api->getRequestMethod());
-        $this->assertStringStartsWith('https://api.test.local/api/v2/log-streams/123', $api->getRequestUrl());
-    }
+    $this->endpoint->create($mock->type, $mock->sink, $mock->name);
 
-    public function testThatCreateLogStreamRequestIsFormedCorrectly(): void
-    {
-        $api = new MockManagementApi();
+    expect($this->api->getRequestMethod())->toEqual('POST');
+    expect($this->api->getRequestUrl())->toEqual('https://api.test.local/api/v2/log-streams');
 
-        $api->mock()->logStreams()->create(
-            'http',
-            [
-                'httpEndpoint' => 'https://me.org',
-                'httpContentFormat' => 'JSONLINES',
-                'httpContentType' => 'application/json',
-                'httpAuthorization' => 'abc123',
-            ],
-            'Test Stream'
-        );
+    $headers = $this->api->getRequestHeaders();
+    expect($headers['Content-Type'][0])->toEqual('application/json');
 
-        $this->assertEquals('POST', $api->getRequestMethod());
-        $this->assertEquals('https://api.test.local/api/v2/log-streams', $api->getRequestUrl());
+    $body = $this->api->getRequestBody();
+    $this->assertArrayHasKey('name', $body);
+    expect($body['name'])->toEqual($mock->name);
+    $this->assertArrayHasKey('type', $body);
+    expect($body['type'])->toEqual($mock->type);
+    $this->assertArrayHasKey('sink', $body);
+    expect($body['sink'])->toEqual($mock->sink);
 
-        $headers = $api->getRequestHeaders();
-        $this->assertEquals('application/json', $headers['Content-Type'][0]);
+    $body = $this->api->getRequestBodyAsString();
+    expect($body)->toEqual(json_encode($mock));
+});
 
-        $body = $api->getRequestBody();
-        $this->assertArrayHasKey('name', $body);
-        $this->assertEquals('Test Stream', $body['name']);
-        $this->assertArrayHasKey('type', $body);
-        $this->assertEquals('http', $body['type']);
-        $this->assertArrayHasKey('sink', $body);
-        $this->assertEquals('https://me.org', $body['sink']['httpEndpoint']);
-        $this->assertEquals('JSONLINES', $body['sink']['httpContentFormat']);
-        $this->assertEquals('application/json', $body['sink']['httpContentType']);
-        $this->assertEquals('abc123', $body['sink']['httpAuthorization']);
-    }
+test('update() issues an appropriate request', function(): void {
+    $mock = (object) [
+        'id' => uniqid(),
+        'body' => [
+            'name' => uniqid()
+        ]
+    ];
 
-    public function testUpdate(): void
-    {
-        $api = new MockManagementApi();
+    $this->endpoint->update($mock->id, $mock->body);
 
-        $api->mock()->logStreams()->update(
-            '123',
-            ['name' => 'Test Name']
-        );
+    expect($this->api->getRequestMethod())->toEqual('PATCH');
+    expect($this->api->getRequestUrl())->toEqual('https://api.test.local/api/v2/log-streams/' . $mock->id);
 
-        $this->assertEquals('PATCH', $api->getRequestMethod());
-        $this->assertEquals('https://api.test.local/api/v2/log-streams/123', $api->getRequestUrl());
+    $headers = $this->api->getRequestHeaders();
+    expect($headers['Content-Type'][0])->toEqual('application/json');
 
-        $headers = $api->getRequestHeaders();
-        $this->assertEquals('application/json', $headers['Content-Type'][0]);
+    $body = $this->api->getRequestBody();
+    $this->assertArrayHasKey('name', $body);
+    expect($body['name'])->toEqual($mock->body['name']);
 
-        $body = $api->getRequestBody();
-        $this->assertArrayHasKey('name', $body);
-        $this->assertEquals('Test Name', $body['name']);
-    }
+    $body = $this->api->getRequestBodyAsString();
+    expect($body)->toEqual(json_encode($mock->body));
+});
 
-    public function testDelete(): void
-    {
-        $api = new MockManagementApi();
+test('delete() issues an appropriate request', function(): void {
+    $this->endpoint->delete('123');
 
-        $api->mock()->logStreams()->delete('123');
+    expect($this->api->getRequestMethod())->toEqual('DELETE');
+    expect($this->api->getRequestUrl())->toEqual('https://api.test.local/api/v2/log-streams/123');
 
-        $this->assertEquals('DELETE', $api->getRequestMethod());
-        $this->assertEquals('https://api.test.local/api/v2/log-streams/123', $api->getRequestUrl());
-
-        $headers = $api->getRequestHeaders();
-        $this->assertEquals('application/json', $headers['Content-Type'][0]);
-    }
-}
+    $headers = $this->api->getRequestHeaders();
+    expect($headers['Content-Type'][0])->toEqual('application/json');
+});

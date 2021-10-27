@@ -44,7 +44,7 @@ final class Token
      * @throws \Auth0\SDK\Exception\InvalidTokenException When Token parsing fails. See the exception message for further details.
      */
     public function __construct(
-        SdkConfiguration &$configuration,
+        SdkConfiguration $configuration,
         string $jwt,
         int $type = self::TYPE_ID_TOKEN
     ) {
@@ -52,7 +52,7 @@ final class Token
         $this->type = $type;
 
         // Store the configuration internally.
-        $this->configuration = & $configuration;
+        $this->configuration = $configuration;
 
         // Begin parsing the token.
         $this->parse($jwt);
@@ -97,7 +97,7 @@ final class Token
         $tokenCache = $tokenCache ?? $this->configuration->getTokenCache() ?? null;
 
         if ($tokenJwksUri === null) {
-            $tokenJwksUri = $this->configuration->buildDomainUri() . '/.well-known/jwks.json';
+            $tokenJwksUri = $this->configuration->formatDomain() . '/.well-known/jwks.json';
         }
 
         $this->parser->verify(
@@ -114,8 +114,8 @@ final class Token
     /**
      * Validate the claims of the token.
      *
-     * @param string             $tokenIssuer       The value expected for the 'iss' claim.
-     * @param array<string>      $tokenAudience     An array of allowed values for the 'aud' claim. Successful if ANY match.
+     * @param string|null        $tokenIssuer       Optional. The value expected for the 'iss' claim.
+     * @param array<string>|null $tokenAudience     Optional. An array of allowed values for the 'aud' claim. Successful if ANY match.
      * @param array<string>|null $tokenOrganization Optional. An array of allowed values for the 'org_id' claim. Successful if ANY match.
      * @param string|null        $tokenNonce        Optional. The value expected for the 'nonce' claim.
      * @param int|null           $tokenMaxAge       Optional. Maximum window of time in seconds since the 'auth_time' to accept the token.
@@ -133,17 +133,14 @@ final class Token
         ?int $tokenLeeway = null,
         ?int $tokenNow = null
     ): self {
-        $tokenIssuer = $tokenIssuer ?? 'https://' . $this->configuration->getDomain() . '/';
-        $tokenAudience = $tokenAudience ?? $this->configuration->getAudience() ?? null;
+        $tokenIssuer = $tokenIssuer ?? $this->configuration->formatDomain() . '/';
+        $tokenAudience = $tokenAudience ?? $this->configuration->getAudience() ?? [];
         $tokenOrganization = $tokenOrganization ?? $this->configuration->getOrganization() ?? null;
         $tokenNonce = $tokenNonce ?? null;
         $tokenMaxAge = $tokenMaxAge ?? $this->configuration->getTokenMaxAge() ?? null;
         $tokenLeeway = $tokenLeeway ?? $this->configuration->getTokenLeeway() ?? 60;
-
-        // If 'aud' claim check isn't defined, fallback to client id.
-        if ($tokenAudience === null || count($tokenAudience) === 0) {
-            $tokenAudience = [ $this->configuration->getClientId() ];
-        }
+        $tokenAudience[] = (string) $this->configuration->getClientId();
+        $tokenAudience = array_unique($tokenAudience);
 
         $validator = $this->parser->validate();
         $now = $tokenNow ?? time();
@@ -185,7 +182,7 @@ final class Token
         $claim = $this->parser->getClaim('aud');
 
         if (is_string($claim)) {
-            return [ $claim ];
+            $claim = [ $claim ];
         }
 
         return $claim;
@@ -202,9 +199,10 @@ final class Token
     /**
      * Get the contents of the 'auth_time' claim. Null if not present.
      */
-    public function getAuthTime(): ?string
+    public function getAuthTime(): ?int
     {
-        return $this->parser->getClaim('auth_time');
+        $response = $this->parser->getClaim('auth_time');
+        return $response === null ? null : (int) $response;
     }
 
     /**
@@ -212,7 +210,8 @@ final class Token
      */
     public function getExpiration(): ?int
     {
-        return $this->parser->getClaim('exp');
+        $response = $this->parser->getClaim('exp');
+        return $response === null ? null : (int) $response;
     }
 
     /**
@@ -220,7 +219,8 @@ final class Token
      */
     public function getIssued(): ?int
     {
-        return $this->parser->getClaim('iat');
+        $response = $this->parser->getClaim('iat');
+        return $response === null ? null : (int) $response;
     }
 
     /**

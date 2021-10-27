@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -24,7 +24,8 @@ final class Blacklists extends ManagementEndpoint
      * @param string|null         $aud     Optional. JWT's aud claim (the client_id to which the JWT was issued).
      * @param RequestOptions|null $options Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `jti` or `aud` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Blacklists/post_tokens
      */
@@ -33,18 +34,23 @@ final class Blacklists extends ManagementEndpoint
         ?string $aud = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($jti, 'jti');
+        [$jti, $aud] = Toolkit::filter([$jti, $aud])->string()->trim();
 
-        $request = [ 'jti' => $jti ];
+        Toolkit::assert([
+            [$jti, \Auth0\SDK\Exception\ArgumentException::missing('jti')],
+        ])->isString();
 
-        if ($aud !== null) {
-            Validate::string($aud, 'aud');
-            $request['aud'] = $aud;
-        }
-
-        return $this->getHttpClient()->method('post')
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('blacklists', 'tokens')
-            ->withBody((object) $request)
+            ->withBody(
+                (object) Toolkit::filter([
+                    [
+                        'jti' => $jti,
+                        'aud' => $aud,
+                    ],
+                ])->array()->trim()[0]
+            )
             ->withOptions($options)
             ->call();
     }
@@ -64,13 +70,13 @@ final class Blacklists extends ManagementEndpoint
         ?string $aud = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        $client = $this->getHttpClient()->method('get')
-            ->addPath('blacklists', 'tokens');
+        [$aud] = Toolkit::filter([$aud])->string()->trim();
 
-        if ($aud !== null) {
-            $client->withParam('aud', $aud);
-        }
-
-        return $client->withOptions($options)->call();
+        return $this->getHttpClient()
+            ->method('get')
+            ->addPath('blacklists', 'tokens')
+            ->withParam('aud', $aud)
+            ->withOptions($options)
+            ->call();
     }
 }

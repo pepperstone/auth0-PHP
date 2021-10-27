@@ -12,20 +12,20 @@ final class HttpRequestBuilt implements Auth0Event
     private RequestInterface $httpRequest;
 
     public function __construct(
-        RequestInterface &$httpRequest
+        RequestInterface $httpRequest
     ) {
-        $this->httpRequest = & $httpRequest;
+        $this->httpRequest = $httpRequest;
     }
 
-    public function &get(): RequestInterface
+    public function get(): RequestInterface
     {
         return $this->httpRequest;
     }
 
     public function set(
-        RequestInterface &$httpRequest
+        RequestInterface $httpRequest
     ): self {
-        $this->httpRequest = & $httpRequest;
+        $this->httpRequest = $httpRequest;
         return $this;
     }
 }

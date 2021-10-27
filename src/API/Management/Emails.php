@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Auth0\SDK\API\Management;
 
 use Auth0\SDK\Utility\Request\RequestOptions;
-use Auth0\SDK\Utility\Shortcut;
-use Auth0\SDK\Utility\Validate;
+use Auth0\SDK\Utility\Toolkit;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -26,7 +25,8 @@ final class Emails extends ManagementEndpoint
      * @param array<mixed>|null   $body        Optional. Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null $options     Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
-     * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `name` or `credentials` are provided.
+     * @throws \Auth0\SDK\Exception\NetworkException  When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Emails/post_provider
      */
@@ -36,17 +36,26 @@ final class Emails extends ManagementEndpoint
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($name, 'name');
-        Validate::array($credentials, 'credentials');
+        [$name] = Toolkit::filter([$name])->string()->trim();
+        [$credentials, $body] = Toolkit::filter([$credentials, $body])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'name' => $name,
-            'credentials' => (object) $credentials,
-        ], $body);
+        Toolkit::assert([
+            [$name, \Auth0\SDK\Exception\ArgumentException::missing('name')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('post')
+        Toolkit::assert([
+            [$credentials, \Auth0\SDK\Exception\ArgumentException::missing('credentials')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('post')
             ->addPath('emails', 'provider')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'name' => $name,
+                    'credentials' => (object) $credentials,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -64,7 +73,8 @@ final class Emails extends ManagementEndpoint
     public function getProvider(
         ?RequestOptions $options = null
     ): ResponseInterface {
-        return $this->getHttpClient()->method('get')
+        return $this->getHttpClient()
+            ->method('get')
             ->addPath('emails', 'provider')
             ->withOptions($options)
             ->call();
@@ -79,6 +89,7 @@ final class Emails extends ManagementEndpoint
      * @param array<mixed>|null   $body        Additional body content to pass with the API request. See @link for supported options.
      * @param RequestOptions|null $options     Optional. Additional request options to use, such as a field filtering or pagination. (Not all endpoints support these. See @link for supported options.)
      *
+     * @throws \Auth0\SDK\Exception\ArgumentException When an invalid `name` or `credentials` are provided.
      * @throws \Auth0\SDK\Exception\NetworkException When the API request fails due to a network error.
      *
      * @link https://auth0.com/docs/api/management/v2#!/Emails/patch_provider
@@ -89,17 +100,26 @@ final class Emails extends ManagementEndpoint
         ?array $body = null,
         ?RequestOptions $options = null
     ): ResponseInterface {
-        Validate::string($name, 'name');
-        Validate::array($credentials, 'credentials');
+        [$name] = Toolkit::filter([$name])->string()->trim();
+        [$credentials, $body] = Toolkit::filter([$credentials, $body])->array()->trim();
 
-        $body = Shortcut::mergeArrays([
-            'name' => $name,
-            'credentials' => (object) $credentials,
-        ], $body);
+        Toolkit::assert([
+            [$name, \Auth0\SDK\Exception\ArgumentException::missing('name')],
+        ])->isString();
 
-        return $this->getHttpClient()->method('patch')
+        Toolkit::assert([
+            [$credentials, \Auth0\SDK\Exception\ArgumentException::missing('credentials')],
+        ])->isArray();
+
+        return $this->getHttpClient()
+            ->method('patch')
             ->addPath('emails', 'provider')
-            ->withBody((object) $body)
+            ->withBody(
+                (object) Toolkit::merge([
+                    'name' => $name,
+                    'credentials' => (object) $credentials,
+                ], $body)
+            )
             ->withOptions($options)
             ->call();
     }
@@ -117,7 +137,8 @@ final class Emails extends ManagementEndpoint
     public function deleteProvider(
         ?RequestOptions $options = null
     ): ResponseInterface {
-        return $this->getHttpClient()->method('delete')
+        return $this->getHttpClient()
+            ->method('delete')
             ->addPath('emails', 'provider')
             ->withOptions($options)
             ->call();

@@ -1,7 +1,6 @@
 # Auth0 PHP SDK
 
 [![Build Status](https://img.shields.io/circleci/project/github/auth0/auth0-PHP/main.svg)](https://circleci.com/gh/auth0/auth0-PHP)
-[![Code Coverage](https://codecov.io/gh/auth0/auth0-PHP/branch/master/graph/badge.svg)](https://codecov.io/gh/auth0/auth0-PHP)
 [![Latest Stable Version](https://img.shields.io/packagist/v/auth0/auth0-PHP?label=stable)](https://packagist.org/packages/auth0/auth0-PHP)
 [![Supported PHP Versions](https://img.shields.io/packagist/php-v/auth0/auth0-php)](https://packagist.org/packages/auth0/auth0-PHP)
 [![License](https://img.shields.io/packagist/l/auth0/auth0-php)](https://packagist.org/packages/auth0/auth0-PHP)
@@ -39,9 +38,9 @@ The Auth0 PHP SDK is a straightforward and rigorously-tested library for accessi
 
 - PHP [7.4](https://www.php.net/ChangeLog-7.php) or [8.0](https://www.php.net/ChangeLog-8.php)
 - [Composer](https://getcomposer.org/)
-- A [PSR-17](https://www.php-fig.org/psr/psr-17/) HTTP factory library. (↗ [Find libraries](https://packagist.org/search/?query=PSR-17&type=library&tags=psr%2017))
-- A [PSR-18](https://www.php-fig.org/psr/psr-18/) HTTP client library. (↗ [Find libraries](https://packagist.org/search/?query=PSR-18&type=library&tags=psr%2018))
-- A [PSR-6](https://www.php-fig.org/psr/psr-6/) caching library is strongly recommended for performance reasons. (↗ [Find libraries](https://packagist.org/search/?query=PSR-6&type=library&tags=psr%206))
+- A [PSR-17](https://www.php-fig.org/psr/psr-17/) HTTP factory library. (↗ [Find libraries](https://packagist.org/providers/psr/http-factory-implementation))
+- A [PSR-18](https://www.php-fig.org/psr/psr-18/) HTTP client library. (↗ [Find libraries](https://packagist.org/providers/psr/http-client-implementation))
+- A [PSR-6](https://www.php-fig.org/psr/psr-6/) caching library is strongly recommended for performance reasons. (↗ [Find libraries](https://packagist.org/providers/psr/cache-implementation))
 
 > ⚠️ PHP 7.3 is supported on the SDK 7.0 branch through December 2021. This README.md is relevant for the SDK 8.0 branch. Please review the README.md within the 7.0 branch for guidance on that version.
 
@@ -77,8 +76,8 @@ The libraries specified above are simply examples. Any libraries that support th
 ↗ [Guzzle 6 is compatible with an adaptor library.](https://github.com/php-http/guzzle6-adapter)<br />
 ↗ [Symfony's HttpClient component natively supports PSR-18.](https://symfony.com/doc/current/http_client.html#psr-18-and-psr-17)<br />
 ↗ [Learn about other compatible libraries from PHP-HTTP.](https://docs.php-http.org/en/latest/clients.html)<br />
-↗ [Search packagist for other PSR-17 HTTP factory libraries.](https://packagist.org/search/?query=PSR-17&type=library&tags=psr%2017)<br />
-↗ [Search packagist for other PSR-18 HTTP client libraries.](https://packagist.org/search/?query=PSR-18&type=library&tags=psr%2018)
+↗ [Search packagist for other PSR-17 HTTP factory libraries.](https://packagist.org/providers/psr/http-factory-implementation)<br />
+↗ [Search packagist for other PSR-18 HTTP client libraries.](https://packagist.org/providers/psr/http-client-implementation)
 
 ### SDK Initialization
 
@@ -137,7 +136,7 @@ As mentioned in the [installation step](#installation), these are just examples:
 
 ### Configuration Options
 
-When configuring the SDK, you can either instantiate `SdkConfiguration` and pass options as named arguments in PHP 8 (strongly recommended) or as an array. The [SDK Initialization step above](#sdk-initialization) uses named arguments. Another method of configuring the SDK is passing an array of key-values matching the argument names and values of the matching allowed types. For example:
+When configuring the SDK, you can instantiate `SdkConfiguration` and pass options as named arguments in PHP 8 (strongly recommended) or as an array. The [SDK Initialization step above](#sdk-initialization) uses named arguments. Another method of configuring the SDK is passing an array of key-values matching the argument names and values of the matching allowed types. For example:
 
 ```PHP
 <?php
@@ -153,58 +152,71 @@ $auth0 = new Auth0([
 
 > ⚠️ You should **never** hard-code tokens or other sensitive configuration data in a real-world application. Consider using environment variables to store and pass these values to your application.
 
-This method is discouraged because you lose out on type hinting, but is useful in PHP 7.4 where named arguments are not supported.
+This method is discouraged because you lose out on type hinting but is helpful in PHP 7.4, where named arguments are not supported.
 
 The following options are available for your configuration:
 
-| Option Name             | Allowed Types                      | Required | Default                          | Description                                                                                                                                                                                                                                                        |
-| ----------------------- | ---------------------------------- | -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `domain`                | `string`,`null`                    | ✅       |                                  | Auth0 domain for your tenant.                                                                                                                                                                                                                                      |
-| `clientId`              | `string`,`null`                    | ✅       |                                  | Client ID, found in the Auth0 Application settings.                                                                                                                                                                                                                |
-| `redirectUri`           | `string`,`null`                    |          | `null`                           | Authentication callback URI, as defined in your Auth0 Application settings.                                                                                                                                                                                        |
-| `clientSecret`          | `string`,`null`                    |          | `null`                           | Client Secret, found in the Auth0 Application settings.                                                                                                                                                                                                            |
-| `audience`              | `array<string>`,`null`             |          | `null`                           | One or more API identifiers, found in your Auth0 API settings. The SDK uses the first value for building links. If provided, at least one of these values must match the 'aud' claim to validate an ID Token successfully.                                         |
-| `organization`          | `array<string>`,`null`             |          | `null`                           | One or more Organization IDs, found in your Auth0 Organization settings. The SDK uses the first value for building links. If provided, at least one of these values must match the 'org_id' claim to validate an ID Token successfully.                            |
-| `usePkce`               | `bool`                             |          | `true`                           | Use PKCE (Proof Key of Code Exchange) with Authorization Code Flow requests.                                                                                                                                                                                       |
-| `scope`                 | `array<string>`                    |          | `['openid', 'profile', 'email']` | One or more scopes to request for Tokens. [Learn more.](https://auth0.com/docs/scopes)                                                                                                                                                                             |
-| `responseMode`          | `string`                           |          | `query`                          | Where to extract request parameters from, either 'query' for GET or 'form_post' for POST requests.                                                                                                                                                                 |
-| `responseType`          | `string`                           |          | `code`                           | Use 'code' for server-side flows and 'token' for application side flow.                                                                                                                                                                                            |
-| `tokenAlgorithm`        | `string`                           |          | `RS256`                          | Algorithm to use for Token verification. Expects either 'RS256' or 'HS256'.                                                                                                                                                                                        |
-| `tokenJwksUri`          | `string`,`null`                    |          | `null`                           | URI to the JWKS when verifying RS256 tokens.                                                                                                                                                                                                                       |
-| `tokenMaxAge`           | `int`,`null`                       |          | `null`                           | The maximum window of time (in seconds) since the 'auth_time' to accept during Token validation.                                                                                                                                                                   |
-| `tokenLeeway`           | `int`,`null`                       |          | `60`                             | Leeway (in seconds) to allow during time calculations with Token validation.                                                                                                                                                                                       |
-| `tokenCache`            | `CacheItemPoolInterface`,`null`    |          | `null`                           | A PSR-6 compatible cache adapter for storing JSON Web Key Sets (JWKS).                                                                                                                                                                                             |
-| `tokenCacheTtl`         | `int`                              |          | `60`                             | How long (in seconds) to keep a JWKS cached.                                                                                                                                                                                                                       |
-| `httpClient`            | `ClientInterface`,`null`           |          | `null`                           | A PSR-18 compatible HTTP client to use for API requests.                                                                                                                                                                                                           |
-| `httpRequestFactory`    | `RequestFactoryInterface`,`null`   |          | `null`                           | A PSR-17 compatible request factory to generate HTTP requests.                                                                                                                                                                                                     |
-| `httpResponseFactory`   | `ResponseFactoryInterface`,`null`  |          | `null`                           | A PSR-17 compatible response factory to generate HTTP responses.                                                                                                                                                                                                   |
-| `httpStreamFactory`     | `StreamFactoryInterface`,`null`    |          | `null`                           | A PSR-17 compatible stream factory to create request body streams.                                                                                                                                                                                                 |
-| `httpTelemetry`         | `bool`                             |          | `true`                           | If true, API requests will include telemetry about the SDK and PHP runtime version to help us improve our services.                                                                                                                                                |
-| `sessionStorage`        | `StoreInterface`,`null`            |          | `null`                           | A StoreInterface-compatible class for storing Token state. `null` will cause the SDK to use PHP native sessions.                                                                                                                                                   |
-| `cookieSecret`          | `string`,`null`                    |          | `null`                           | The secret used to derive an encryption key for the user identity in a session cookie and to sign the transient cookies used by the login callback.                                                                                                                |
-| `cookieDomain`          | `string`,`null`                    |          | `null`                           | Defaults to value of HTTP_HOST server environment information. Cookie domain, for example 'www.example.com', for use with PHP sessions and SDK cookies. To make cookies visible on all subdomains then the domain must be prefixed with a dot like '.example.com'. |
-| `cookieExpires`         | `int`                              |          | `0`                              | How long, in seconds, before cookies expire. If set to 0 the cookie will expire at the end of the session (when the browser closes).                                                                                                                               |
-| `cookiePath`            | `string`                           |          | `/`                              | Specifies path on the domain where the cookies will work. Use a single slash ('/') for all paths on the domain.                                                                                                                                                    |
-| `cookieSecure`          | `bool`                             |          | `false`                          | Specifies whether cookies should ONLY be sent over secure connections.                                                                                                                                                                                             |
-| `persistUser`           | `bool`                             |          | `true`                           | If true, the user data will persist in session storage.                                                                                                                                                                                                            |
-| `persistIdToken`        | `bool`                             |          | `true`                           | If true, the Id Token will persist in session storage.                                                                                                                                                                                                             |
-| `persistAccessToken`    | `bool`                             |          | `true`                           | If true, the Access Token will persist in session storage.                                                                                                                                                                                                         |
-| `persistRefreshToken`   | `bool`                             |          | `true`                           | If true, the Refresh Token will persist in session storage.                                                                                                                                                                                                        |
-| `transientStorage`      | `StoreInterface`,`null`            |          | `null`                           | A StoreInterface-compatible class for storing ephemeral state data, such as a nonce.                                                                                                                                                                               |
-| `queryUserInfo`         | `bool`                             |          | `false`                          | If true, always query the /userinfo endpoint during an authorization code exchange.                                                                                                                                                                                |
-| `managementToken`       | `string`,`null`                    |          | `null`                           | An Access Token to use for Management API calls. If there isn't one specified, the SDK will attempt to get one for you using your configured `clientSecret`.                                                                                                       |
-| `managementTokenCache`  | `CacheItemPoolInterface`,`null`    |          | `null`                           | A PSR-6 compatible cache adapter for storing management access tokens..                                                                                                                                                                                            |
-| `eventListenerProvider` | `ListenerProviderInterface`,`null` |          | `null`                           | A PSR-14 compatible event listener for hooking into SDK events..                                                                                                                                                                                                   |
+```text
+$strategy              string|null                    Defaults to 'webapp'. Should be assigned either 'api', 'management', or 'webapp' to specify the type of application the SDK is being applied to. Determines what configuration options will be required at initialization.
+$domain                string|null                    Auth0 domain for your tenant, found in your Auth0 Application settings.
+$customDomain          string|null                    If you have configured Auth0 to use a custom domain, configure it here.
+$clientId              string|null                    Client ID, found in the Auth0 Application settings.
+$redirectUri           string|null                    Authentication callback URI, as defined in your Auth0 Application settings.
+$clientSecret          string|null                    Client Secret, found in the Auth0 Application settings.
+$audience              array<string>|null             One or more API identifiers, found in your Auth0 API settings. The SDK uses the first value for building links. If provided, at least one of these values must match the 'aud' claim to validate an ID Token successfully.
+$organization          array<string>|null             One or more Organization IDs, found in your Auth0 Organization settings. The SDK uses the first value for building links. If provided, at least one of these values must match the 'org_id' claim to validate an ID Token successfully.
+$usePkce               bool                           Defaults to true. Use PKCE (Proof Key of Code Exchange) with Authorization Code Flow requests. See https://auth0.com/docs/flows/call-your-api-using-the-authorization-code-flow-with-pkce
+$scope                 array<string>                  One or more scopes to request for Tokens. See https://auth0.com/docs/scopes
+$responseMode          string                         Defaults to 'query.' Where to extract request parameters from, either 'query' for GET or 'form_post' for POST requests.
+$responseType          string                         Defaults to 'code.' Use 'code' for server-side flows and 'token' for application side flow.
+$tokenAlgorithm        string                         Defaults to 'RS256'. Algorithm to use for Token verification. Expects either 'RS256' or 'HS256'.
+$tokenJwksUri          string|null                    URI to the JWKS when verifying RS256 tokens.
+$tokenMaxAge           int|null                       The maximum window of time (in seconds) since the 'auth_time' to accept during Token validation.
+$tokenLeeway           int                            Defaults to 60. Leeway (in seconds) to allow during time calculations with Token validation.
+$tokenCache            CacheItemPoolInterface|null    A PSR-6 compatible cache adapter for storing JSON Web Key Sets (JWKS).
+$tokenCacheTtl         int                            How long (in seconds) to keep a JWKS cached.
+$httpClient            ClientInterface|null           A PSR-18 compatible HTTP client to use for API requests.
+$httpMaxRetries        int                            When a rate-limit (429 status code) response is returned from the Auth0 API, automatically retry the request up to this many times.
+$httpRequestFactory    RequestFactoryInterface|null   A PSR-17 compatible request factory to generate HTTP requests.
+$httpResponseFactory   ResponseFactoryInterface|null  A PSR-17 compatible response factory to generate HTTP responses.
+$httpStreamFactory     StreamFactoryInterface|null    A PSR-17 compatible stream factory to create request body streams.
+$httpTelemetry         bool                           Defaults to true. If true, API requests will include telemetry about the SDK and PHP runtime version to help us improve our services.
+$sessionStorage        StoreInterface|null            Defaults to use cookies. A StoreInterface-compatible class for storing Token state.
+$sessionStorageId      string                         Defaults to 'auth0_session'. The namespace to prefix session items under.
+$cookieSecret          string|null                    The secret used to derive an encryption key for the user identity in a session cookie and to sign the transient cookies used by the login callback.
+$cookieDomain          string|null                    Defaults to value of HTTP_HOST server environment information. Cookie domain, for example 'www.example.com', for use with PHP sessions and SDK cookies. To make cookies visible on all subdomains then the domain must be prefixed with a dot like '.example.com'.
+$cookieExpires         int                            Defaults to 0. How long, in seconds, before cookies expire. If set to 0 the cookie will expire at the end of the session (when the browser closes).
+$cookiePath            string                         Defaults to '/'. Specifies path on the domain where the cookies will work. Use a single slash ('/') for all paths on the domain.
+$cookieSecure          bool                           Defaults to false. Specifies whether cookies should ONLY be sent over secure connections.
+$persistUser           bool                           Defaults to true. If true, the user data will persist in session storage.
+$persistIdToken        bool                           Defaults to true. If true, the Id Token will persist in session storage.
+$persistAccessToken    bool                           Defaults to true. If true, the Access Token will persist in session storage.
+$persistRefreshToken   bool                           Defaults to true. If true, the Refresh Token will persist in session storage.
+$transientStorage      StoreInterface|null            Defaults to use cookies. A StoreInterface-compatible class for storing ephemeral state data, such as nonces.
+$transientStorageId    string                         Defaults to 'auth0_transient'. The namespace to prefix transient items under.
+$queryUserInfo         bool                           Defaults to false. If true, query the /userinfo endpoint during an authorization code exchange.
+$managementToken       string|null                    An Access Token to use for Management API calls. If there isn't one specified, the SDK will attempt to get one for you using your $clientSecret.
+$managementTokenCache  CacheItemPoolInterface|null    A PSR-6 compatible cache adapter for storing generated management access tokens.
+$eventListenerProvider ListenerProviderInterface|null A PSR-14 compatible event listener provider, for interfacing with events triggered by the SDK.
+```
 
 ↗ [Learn more about PSR-6 caches.](https://www.php-fig.org/psr/psr-6/)<br />
 ↗ [Learn more about PSR-14 Event Dispatchers.](https://www.php-fig.org/psr/psr-14/)<br />
 ↗ [Learn more about PSR-17 HTTP Factories,](https://www.php-fig.org/psr/psr-17/) which are used to create [PSR-7 HTTP messages.](https://www.php-fig.org/psr/psr-7/)<br />
 ↗ [Learn more about the PSR-18 HTTP Client standard.](https://www.php-fig.org/psr/psr-18/)<br />
-↗ [Find PSR-6 cache libraries on Packagist.](https://packagist.org/search/?query=PSR-6&type=library&tags=psr%206)<br />
-↗ [Find PSR-17 HTTP factory libraries on Packagist.](https://packagist.org/search/?query=PSR-17&type=library&tags=psr%2017)<br />
-↗ [Find PSR-18 HTTP client libraries on Packagist.](https://packagist.org/search/?query=PSR-18&type=library&tags=psr%2018)
+↗ [Find PSR-6 cache libraries on Packagist.](https://packagist.org/providers/psr/cache-implementation)<br />
+↗ [Find PSR-17 HTTP factory libraries on Packagist.](https://packagist.org/providers/psr/http-factory-implementation)<br />
+↗ [Find PSR-18 HTTP client libraries on Packagist.](https://packagist.org/providers/psr/http-client-implementation)
 
-### Getting an active session
+### Configuration Strategies
+
+The PHP SDK is a robust and flexible library capable of integration with many types of applications. You can define the style of application you're integrating the SDK with using the `strategy` configuration option, which controls what configuration options will be required at class instantiation to provide the best experience.
+
+- `webapp`, the default configuration, will require `domain` and `clientId`. `clientSecret` is required when `tokenAlgorithm` is set to `HS256`. This is suitable for most application types.
+- `api` indicates you'll be using the SDK in a stateless API-only environment; only `domain` and `audience` are required in this configuration.
+- `management` is for stateless applications exclusively using Management API calls; `managementToken` and/or `clientId` and `clientSecret` are required in this case.
+
+### Checking for an active session
 
 ```PHP
 <?php
@@ -215,27 +227,11 @@ The following options are available for your configuration:
 $session = $auth0->getCredentials();
 
 if ($session !== null) {
-    // The Id Token for the user as a string.
-    $idToken = $session->idToken;
-
-    // The Access Token for the user, as a string.
-    $accessToken = $session->accessToken;
-
-    // A Unix timestamp representing when the Access Token is expected to expire, as an int.
-    $accessTokenExpiration = $session->accessTokenExpiration;
-
-    // A bool; if time() is greater than the value of $accessTokenExpiration, this will be true.
-    $accessTokenExpired = $session->accessTokenExpired;
-
-    // A Refresh Token, if available, as a string.
-    $refreshToken = $session->refreshToken;
-
-    // Data about the user as an array.
-    $user = $session->user;
+    // The user is signed in.
 }
 ```
 
-### Logging in
+### Authorizing User
 
 ```PHP
 <?php
@@ -247,8 +243,30 @@ $session = $auth0->getCredentials();
 // Is this end-user already signed in?
 if ($session === null) {
     // They are not. Redirect the end user to the login page.
-    header('Location: ', $auth0->login());
+    header('Location: ' . $auth0->login());
     exit;
+}
+```
+
+### Requesting Tokens
+
+After a user successfully authenticates with Auth0 from the step above, they'll be returned to your application with the `state` and `code` URL parameters necessary to request a token. This is the last step in finalizing the user session.
+
+```PHP
+<?php
+
+// 🧩 Include the configuration code from the 'SDK Initialization' step above here.
+
+$session = $auth0->getCredentials();
+
+// Is this end-user already signed in?
+if ($session === null && isset($_GET['code']) && isset($_GET['state'])) {
+    if ($auth0->exchange() === false) {
+        die("Authentication failed.");
+    }
+
+    // Authentication complete!
+    print_r($auth0->getUser());
 }
 ```
 
@@ -265,7 +283,7 @@ $session = $auth0->getCredentials();
 
 if ($session) {
     // Clear the end-user's session, and redirect them to the Auth0 /logout endpoint.
-    header('Location: ', $auth0->logout());
+    header('Location: ' . $auth0->logout());
     exit;
 }
 ```
@@ -287,7 +305,7 @@ $session = $auth0->getCredentials();
 // Is this end-user already signed in?
 if ($session === null) {
     // They are not. Redirect the end user to the login page.
-    header('Location: ', $auth0->login());
+    header('Location: ' . $auth0->login());
     exit;
 }
 
@@ -301,7 +319,7 @@ if ($session->accessTokenExpired) {
         $auth0->clear();
 
         // Prompt to login again.
-        header('Location: ', $auth0->login());
+        header('Location: ' . $auth0->login());
         exit;
     }
 }
@@ -325,21 +343,7 @@ try {
 
 ### Using the Authentication API
 
-More advanced applications can access the SDK's full suite of authentication API functions using the `Auth0\SDK\API\Authentication` class:
-
-```PHP
-<?php
-
-// 🧩 Include the configuration code from the 'SDK Initialization' step above here.
-
-// Get a configured instance of the Auth0\SDK\API\Authentication class:
-$authentication = $auth0->authentication();
-
-// Start a passwordless login:
-$auth0->emailPasswordlessStart(/* ...configuration */);
-```
-
-Alternatively, the SDK supports a fluent interface for more concise calls:
+More advanced applications can access the SDK's full suite of authentication API methods using the `Auth0\SDK\API\Authentication` class:
 
 ```PHP
 <?php
@@ -361,11 +365,11 @@ use Auth0\SDK\Configuration\SdkConfiguration;
 use Auth0\SDK\Utility\HttpResponse;
 
 $configuration = new SdkConfiguration(
-    // 🧩 Include other required configuration options, such as outlined in the 'SDK Initialization' step above here.
+    // 🧩 Include other required configuration options, such as those outlined in the 'SDK Initialization' step above here.
 
     // The process for retrieving an Access Token for Management API endpoints is described here:
     // https://auth0.com/docs/libraries/auth0-php/using-the-management-api-with-auth0-php
-    managementToken: '{{YOUR_ACCESS_TOKEN}}'
+    managementToken: '{{YOUR_MANAGEMENT_ACCESS_TOKEN}}'
 );
 
 $auth0 = new Auth0($configuration);
@@ -380,35 +384,13 @@ Once configured, use the `Auth0::management()` method to get a configured instan
 
 // 🧩 Include the configuration code from the above example here.
 
-// Get a configured instance of the Auth0\SDK\API\Management class:
-$management = $auth0->management();
-
-// Request users from the /users Management API endpoint
-$response = $management->users()->getAll();
-
-// Was the API request successful?
-if (HttpResponse::wasSuccessful($response)) {
-    // It was, decode the JSON into a PHP array:
-    $response = HttpResponse::decodeContent($response);
-    print_r($response);
-}
-```
-
-Alternatively, the SDK supports a fluent interface for more concise calls:
-
-```PHP
-<?php
-
-// 🧩 Include the configuration code from the above example here.
-
 // Request users from the /users Management API endpoint
 $management = $auth0->management()->users()->getAll();
 
 // Was the API request successful?
 if (HttpResponse::wasSuccessful($response)) {
     // It was, decode the JSON into a PHP array:
-    $response = HttpResponse::decodeContent($response);
-    print_r($response);
+    print_r(HttpResponse::decodeContent($response);
 }
 ```
 
@@ -427,7 +409,7 @@ use Auth0\SDK\Configuration\SdkConfiguration;
 use Auth0\SDK\Utility\HttpResponse;
 
 $configuration = new SdkConfiguration(
-    // 🧩 Include other required configuration options, such as outlined in the 'SDK Initialization' step above here.
+    // 🧩 Include other required configuration options, such as those outlined in the 'SDK Initialization' step above here.
 
     // Found in your Auth0 dashboard, under your organization settings.
     // Note that this must be configured as an array.
@@ -453,7 +435,7 @@ $session = $auth0->getCredentials();
 // Is this end-user already signed in?
 if ($session === null) {
   // They are not. Redirect the end user to the login page.
-  header('Location: ', $auth0->login());
+  header('Location: ' . $auth0->login());
   exit;
 }
 ```
@@ -490,7 +472,7 @@ if ($invite = $auth0->getInvitationParameters()) {
   }
 
   // Redirect to Universal Login using the emailed invitation code and Organization Id
-  header('Location: ', $auth0->login(null, [
+  header('Location: ' . $auth0->login(null, [
     'invitation' => $invite->invitation,
     'organization' => $invite->organization,
   ]));
@@ -517,8 +499,8 @@ In some cases, your application may need to support validating tokens' `org_id` 
   - [Management API](https://auth0.com/docs/libraries/auth0-php/using-the-management-api-with-auth0-php)
   - [Troubleshooting](https://auth0.com/docs/libraries/auth0-php/troubleshoot-auth0-php-library)
 - Quickstarts
-  - [Web Application Authentication](https://auth0.com/docs/quickstart/webapp/php-beta/) ([GitHub repo](https://github.com/auth0-samples/auth0-php-web-app/tree/8.x))
-  - [Backend API Authorization](https://auth0.com/docs/quickstart/backend/php-beta/) ([GitHub repo](https://github.com/auth0-samples/auth0-php-api-samples/tree/8.x))
+  - [Web Application Authentication](https://auth0.com/docs/quickstart/webapp/php/) ([GitHub repo](https://github.com/auth0-samples/auth0-php-web-app))
+  - [Backend API Authorization](https://auth0.com/docs/quickstart/backend/php/) ([GitHub repo](https://github.com/auth0-samples/auth0-php-api-samples))
 
 ## Contributing
 

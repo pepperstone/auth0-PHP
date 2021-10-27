@@ -21,6 +21,11 @@ use Psr\Http\Message\StreamInterface;
  */
 final class HttpRequest
 {
+    public const MAX_REQUEST_RETRIES = 10;
+    public const MAX_REQUEST_RETRY_JITTER = 100;
+    public const MAX_REQUEST_RETRY_DELAY = 1000;
+    public const MIN_REQUEST_RETRY_DELAY = 100;
+
     /**
      * Shared configuration data.
      */
@@ -82,6 +87,18 @@ final class HttpRequest
     private string $body = '';
 
     /**
+     * The number of requests this instance has made.
+     */
+    private int $count = 0;
+
+    /**
+     * The milliseconds slept between each request retry.
+     *
+     * @var array<int>
+     */
+    private array $waits = [0];
+
+    /**
      * Stored instance of last send request.
      */
     private ?RequestInterface $lastRequest = null;
@@ -99,9 +116,15 @@ final class HttpRequest
     private ?array $mockedResponses = null;
 
     /**
+     * The context in which this client was created, for defining special behaviors.
+     */
+    private int $context = HttpClient::CONTEXT_AUTHENTICATION_CLIENT;
+
+    /**
      * HttpRequest constructor.
      *
      * @param SdkConfiguration   $configuration   Required. Base configuration options for the SDK. See the SdkConfiguration class constructor for options.
+     * @param int                $context         Required. The context the client is being created under, either HttpClient::CONTEXT_GENERIC_CLIENT, HttpClient::CONTEXT_AUTHENTICATION_CLIENT or HttpClient::CONTEXT_MANAGEMENT_CLIENT.
      * @param string             $method          Required. Type of HTTP request method to use, e.g. 'GET' or 'POST'.
      * @param string             $basePath        Optional. The base URI path from which additional pathing and parameters should be appended.
      * @param array<int|string>  $headers         Optional. Additional headers to send with the HTTP request.
@@ -109,14 +132,16 @@ final class HttpRequest
      * @param array<object>|null $mockedResponses Optional. Only intended for unit testing purposes.
      */
     public function __construct(
-        SdkConfiguration &$configuration,
+        SdkConfiguration $configuration,
+        int $context,
         string $method,
         string $basePath = '/',
         array $headers = [],
         ?string $domain = null,
-        ?array &$mockedResponses = null
+        ?array & $mockedResponses = null
     ) {
-        $this->configuration = & $configuration;
+        $this->configuration = $configuration;
+        $this->context = $context;
         $this->method = mb_strtoupper($method);
         $this->basePath = $basePath;
         $this->headers = $headers;
@@ -141,14 +166,37 @@ final class HttpRequest
     }
 
     /**
+     * Return the number of requests made from this instance.
+     */
+    public function getRequestCount(): int
+    {
+        return $this->count;
+    }
+
+    /**
+     * The milliseconds slept between request retries.
+     *
+     * @return array<int>
+     */
+    public function getRequestDelays(): array
+    {
+        return $this->waits;
+    }
+
+    /**
      * Add paths to the request URL.
      *
      * @param string ...$params String paths to append to the request.
      */
     public function addPath(
-        string ...$params
+        ?string ...$params
     ): self {
-        $this->path = array_merge($this->path, $params);
+        [$params] = Toolkit::filter([$params])->array()->trim();
+
+        if (count($params) !== 0) {
+            $this->path = array_merge($this->path, $params);
+        }
+
         return $this;
     }
 
@@ -179,28 +227,34 @@ final class HttpRequest
     /**
      * Add a file to be sent with the request.
      *
-     * @param string $field     Field name in the multipart request.
-     * @param string $file_path Path to the file to send.
+     * @param string      $field     Field name in the multipart request.
+     * @param string|null $file_path Path to the file to send.
      */
     public function addFile(
         string $field,
-        string $file_path
+        ?string $file_path
     ): self {
-        $this->files[$field] = $file_path;
+        if ($file_path !== null) {
+            $this->files[$field] = $file_path;
+        }
+
         return $this;
     }
 
     /**
      * Add a form value to be sent with the request.
      *
-     * @param string          $key Form parameter key.
-     * @param bool|int|string $value Form parameter value.
+     * @param string               $key Form parameter key.
+     * @param bool|int|string|null $value Form parameter value.
      */
     public function withFormParam(
         string $key,
         $value
     ): self {
-        $this->formParams[$key] = $this->prepareBoolParam($value);
+        if ($value !== null) {
+            $this->formParams[$key] = $this->prepareBoolParam($value);
+        }
+
         return $this;
     }
 
@@ -228,10 +282,11 @@ final class HttpRequest
      */
     public function call(): ResponseInterface
     {
-        $domain = $this->configuration->buildDomainUri();
+        $domain = $this->configuration->formatDomain();
         $uri = $domain . $this->basePath . $this->getUrl();
         $httpRequestFactory = $this->configuration->getHttpRequestFactory();
         $httpClient = $this->configuration->getHttpClient();
+        $configuredRetries = $this->configuration->getHttpMaxRetries();
         $httpRequest = $httpRequestFactory->createRequest($this->method, $uri);
         $headers = $this->headers;
         $mockedResponse = null;
@@ -280,12 +335,14 @@ final class HttpRequest
         }
 
         // Dispatch event to listeners of Auth0\SDK\EventHttpRequestBuilt.
-        $this->configuration->getEventDispatcher()->dispatch(new HttpRequestBuilt($httpRequest));
+        $this->configuration->eventDispatcher()->dispatch(new HttpRequestBuilt($httpRequest));
 
         // Store the request so it can be potentially reviewed later for error troubleshooting, testing, etc.
         $this->lastRequest = $httpRequest;
 
         try {
+            ++$this->count;
+
             if ($mockedResponse && $mockedResponse->exception instanceof \Exception) { // @phpstan-ignore-line
                 throw $mockedResponse->exception; // @phpstan-ignore-line
             }
@@ -299,10 +356,39 @@ final class HttpRequest
             }
 
             // Dispatch event to listeners of Auth0\SDK\HttpResponseReceived.
-            $this->configuration->getEventDispatcher()->dispatch(new HttpResponseReceived($httpResponse, $httpRequest));
+            $this->configuration->eventDispatcher()->dispatch(new HttpResponseReceived($httpResponse, $httpRequest));
 
             // Store the last response so it can be potentially reviewed later for error troubleshooting, testing, etc.
             $this->lastResponse = $httpResponse;
+
+            // If the API responds with a 429, try reissuing the request up to 3 times before returning the last response.
+            if ($httpResponse->getStatusCode() === 429 && $configuredRetries > 0 && $this->context === HttpClient::CONTEXT_MANAGEMENT_CLIENT) {
+                $attempt = $this->getRequestCount();
+                $maxRetries = min(self::MAX_REQUEST_RETRIES, $configuredRetries);
+
+                if ($attempt < $maxRetries) {
+                    /**
+                     * Use an exponential back-off with the formula:
+                     * max(MIN_REQUEST_RETRY_DELAY, min(MAX_REQUEST_RETRY_DELAY, (100ms * (2 ** attempt - 1)) + random_between(0, MAX_REQUEST_RETRY_JITTER)))
+                     *
+                     * Each retry attempt:
+                     * ✔ Increases base delay by (100ms * (2 ** attempt - 1))
+                     * ✔ Introduces jitter to the base delay; increases delay between 1ms to MAX_REQUEST_RETRY_JITTER (100ms)
+                     * ✔ Is never less than MIN_REQUEST_RETRY_DELAY (100ms)
+                     * ✔ Is never more than MAX_REQUEST_RETRY_DELAY (1s)
+                     */
+                    $wait = intval(100 * pow(2, $attempt - 1)); // Exponential delay with each subsequent request attempt.
+                    $wait = mt_rand($wait + 1, $wait + self::MAX_REQUEST_RETRY_JITTER); // Add jitter to the delay window.
+                    $wait = min(self::MAX_REQUEST_RETRY_DELAY, $wait); // Ensure delay is less than MAX_REQUEST_RETRY_DELAY.
+                    $wait = max(self::MIN_REQUEST_RETRY_DELAY, $wait); // Ensure delay is more than MIN_REQUEST_RETRY_DELAY.
+
+                    // Briefly wait before attempting again.
+                    $this->sleep($wait);
+
+                    // Make subsequent attempt.
+                    $httpResponse = $this->call();
+                }
+            }
 
             // Return the response.
             return $httpResponse;
@@ -351,9 +437,7 @@ final class HttpRequest
         $body,
         bool $jsonEncode = true
     ): self {
-        if (is_object($body)) {
-            $body = json_encode($body, JSON_FORCE_OBJECT | JSON_THROW_ON_ERROR);
-        } elseif (is_array($body) || is_string($body) && $jsonEncode === true) {
+        if (is_array($body) || is_object($body) || is_string($body) && $jsonEncode === true) {
             $body = json_encode($body, JSON_THROW_ON_ERROR);
         }
 
@@ -364,13 +448,17 @@ final class HttpRequest
     /**
      * Add a URL parameter to the request.
      *
-     * @param string          $key   URL parameter key.
-     * @param bool|int|string $value URL parameter value.
+     * @param string               $key   URL parameter key.
+     * @param bool|int|string|null $value URL parameter value.
      */
     public function withParam(
         string $key,
         $value
     ): self {
+        if ($value === null) {
+            return $this;
+        }
+
         $this->params[$key] = $this->prepareBoolParam($value);
         return $this;
     }
@@ -483,5 +571,26 @@ final class HttpRequest
         }
 
         return $value;
+    }
+
+    /**
+     * Issue a usleep() for $milliseconds, and log the delay.
+     *
+     * @param int $milliseconds How long, in milliseconds, to trigger a usleep() for.
+     *
+     * @codeCoverageIgnore
+     */
+    private function sleep(
+        int $milliseconds
+    ): self {
+        $this->waits[] = $milliseconds;
+
+        // Don't actually trigger a sleep if we're running tests.
+        if (! defined('AUTH0_TESTS_DIR')) {
+            // usleep() uses microseconds, so * 1000 for the correct conversion.
+            usleep($milliseconds * 1000);
+        }
+
+        return $this;
     }
 }
